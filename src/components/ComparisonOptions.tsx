@@ -31,6 +31,7 @@ interface ComparisonOptionsProps {
 }
 
 const AVAILABLE_STANDARDS = ['CMRT', 'EMRT', 'AMRT'];
+const FILTERED_METALS = ['Gold', 'Tin', 'Cobalt', 'Copper', 'Nickel'];
 
 const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange, settings, availableMetals }) => {
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
@@ -110,9 +111,10 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
   };
 
   const selectAllMetals = () => {
+    const filteredMetals = availableMetals.filter(metal => FILTERED_METALS.includes(metal));
     onSettingsChange({
       ...settings,
-      metals: [...availableMetals]
+      metals: [...filteredMetals]
     });
   };
 
@@ -233,7 +235,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
                   variant="outline" 
                   size="sm" 
                   onClick={selectAllMetals}
-                  disabled={settings.metals.length === availableMetals.length}
+                  disabled={settings.metals.length === availableMetals.filter(metal => FILTERED_METALS.includes(metal)).length}
                 >
                   Выбрать все
                 </Button>
@@ -250,7 +252,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {availableMetals.length > 0 ? (
-                availableMetals.map(metal => (
+                availableMetals.filter(metal => FILTERED_METALS.includes(metal)).map(metal => (
                   <div key={metal} className="flex items-center space-x-2">
                     <Checkbox
                       id={`metal-${metal}`}
