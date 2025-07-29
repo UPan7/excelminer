@@ -70,6 +70,37 @@ const parseCSV = (text: string): string[][] => {
   return result;
 };
 
+const parseCMRTCSV = (text: string): string[][] => {
+  const lines = text.split(/\r?\n/).filter(line => line.trim());
+  if (lines.length === 0) return [];
+  
+  // Check if first line contains all headers in one field (CMRT format issue)
+  const firstLine = lines[0];
+  if (firstLine.includes('Metal,"Smelter Reference"') || firstLine.includes('Metal,Smelter Reference')) {
+    console.log('Detected CMRT format with headers in first line');
+    
+    // Split the header line properly
+    const headerParts = firstLine.split(',').map(part => part.replace(/"/g, '').trim());
+    const result = [headerParts];
+    
+    // Process data lines
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      
+      const parts = line.split(',').map(part => part.replace(/"/g, '').trim());
+      if (parts.length >= headerParts.length) {
+        result.push(parts);
+      }
+    }
+    
+    return result;
+  }
+  
+  // Fallback to regular CSV parsing
+  return parseCSV(text);
+};
+
 const ReferenceDataManagement = () => {
   const { user, loading: authLoading, signOut, userRole } = useAuth();
   const [referenceLists, setReferenceLists] = useState<ReferenceList[]>([]);
@@ -146,7 +177,7 @@ const ReferenceDataManagement = () => {
       if (file.name.toLowerCase().endsWith('.csv')) {
         // Handle CSV files with proper parsing
         const text = await file.text();
-        data = parseCSV(text);
+        data = listType === 'CMRT' ? parseCMRTCSV(text) : parseCSV(text);
       } else {
         // Handle Excel files
         const arrayBuffer = await file.arrayBuffer();
