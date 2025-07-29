@@ -29,47 +29,6 @@ interface ReferenceStats {
   last_updated: string;
 }
 
-const parseCSV = (text: string): string[][] => {
-  const lines = text.split(/\r?\n/);
-  const result: string[][] = [];
-  
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    
-    const row: string[] = [];
-    let currentField = '';
-    let insideQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      const nextChar = line[i + 1];
-      
-      if (char === '"') {
-        if (insideQuotes && nextChar === '"') {
-          // Escaped quote
-          currentField += '"';
-          i++; // Skip next quote
-        } else {
-          // Toggle quote state
-          insideQuotes = !insideQuotes;
-        }
-      } else if (char === ',' && !insideQuotes) {
-        // Field separator
-        row.push(currentField.trim());
-        currentField = '';
-      } else {
-        currentField += char;
-      }
-    }
-    
-    // Add the last field
-    row.push(currentField.trim());
-    result.push(row);
-  }
-  
-  return result;
-};
-
 const ReferenceDataManagement = () => {
   const { user, loading: authLoading, signOut, userRole } = useAuth();
   const [referenceLists, setReferenceLists] = useState<ReferenceList[]>([]);
@@ -141,20 +100,11 @@ const ReferenceDataManagement = () => {
       setUploadProgress(prev => ({ ...prev, [listType]: 0 }));
 
       // Parse the file
-      let data: string[][];
-      
-      if (file.name.toLowerCase().endsWith('.csv')) {
-        // Handle CSV files with proper parsing
-        const text = await file.text();
-        data = parseCSV(text);
-      } else {
-        // Handle Excel files
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
-      }
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
 
       if (data.length < 2) {
         throw new Error('Datei muss Kopfzeilen und Daten enthalten');
@@ -164,13 +114,7 @@ const ReferenceDataManagement = () => {
       const rows = data.slice(1);
       
       console.log('CSV Headers found:', headers);
-      console.log('Headers length:', headers.length);
       console.log('Total rows to process:', rows.length);
-      
-      // Check if headers were parsed correctly (should have multiple columns)
-      if (headers.length < 3) {
-        throw new Error('CSV-Datei wurde nicht korrekt geparst. Bitte stellen Sie sicher, dass es sich um eine gültige CSV-Datei handelt.');
-      }
 
       // Map headers to database columns with more flexible matching
       const headerMapping = {
