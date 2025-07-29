@@ -30,7 +30,6 @@ interface ComparisonOptionsProps {
 }
 
 const AVAILABLE_STANDARDS = ['CMRT', 'EMRT', 'AMRT'];
-const AVAILABLE_METALS = ['Gold', 'Tin', 'Tantalum', 'Tungsten'];
 
 const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange, settings }) => {
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
@@ -38,6 +37,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
     totalRecords: 0,
     details: []
   });
+  const [availableMetals, setAvailableMetals] = useState<string[]>([]);
 
   useEffect(() => {
     loadDatabaseStatus();
@@ -58,6 +58,18 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
         .rpc('get_reference_stats');
 
       if (statsError) throw statsError;
+
+      // Load all available metals from database
+      const { data: metalData, error: metalError } = await supabase
+        .from('reference_facilities')
+        .select('metal')
+        .not('metal', 'is', null);
+
+      if (metalError) throw metalError;
+
+      const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(metal => metal != null && metal.trim() !== ''))].sort();
+      console.log('Загружено металлов из базы данных:', uniqueMetals.length, uniqueMetals);
+      setAvailableMetals(uniqueMetals);
 
       const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
       const isReady = (lists || []).length > 0 && totalRecords > 0;
@@ -112,7 +124,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
   const selectAllMetals = () => {
     onSettingsChange({
       ...settings,
-      metals: [...AVAILABLE_METALS]
+      metals: [...availableMetals]
     });
   };
 
@@ -227,13 +239,15 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
           {/* Metals Selection */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Металлы для проверки</Label>
+              <Label className="text-base font-medium">
+                Металлы для проверки ({availableMetals.length} доступно)
+              </Label>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={selectAllMetals}
-                  disabled={settings.metals.length === AVAILABLE_METALS.length}
+                  disabled={settings.metals.length === availableMetals.length}
                 >
                   Выбрать все
                 </Button>
@@ -249,7 +263,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {AVAILABLE_METALS.map(metal => (
+              {availableMetals.map(metal => (
                 <div key={metal} className="flex items-center space-x-2">
                   <Checkbox
                     id={`metal-${metal}`}
@@ -265,7 +279,12 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
                 </div>
               ))}
             </div>
-            {settings.metals.length === 0 && (
+            {availableMetals.length === 0 && (
+              <p className="text-sm text-amber-600">
+                ⚠️ Загрузка металлов из базы данных...
+              </p>
+            )}
+            {settings.metals.length === 0 && availableMetals.length > 0 && (
               <p className="text-sm text-amber-600">
                 ⚠️ Выберите хотя бы один металл для проверки
               </p>
