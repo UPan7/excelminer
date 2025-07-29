@@ -65,11 +65,18 @@ export class ComparisonEngine {
       'certified',
       'approved',
       'conform',
-      'valid'
+      'valid',
+      'rmi' // Добавляем 'rmi' как валидный статус
     ];
     
     const normalizedStatus = status.toLowerCase().trim();
     console.log('Проверка статуса:', normalizedStatus);
+    
+    // Если статус пустой, но плавильня найдена в RMI списке, считаем ее соответствующей
+    if (!normalizedStatus) {
+      console.log('Пустой статус, но плавильня найдена в RMI - считаем соответствующей');
+      return true;
+    }
     
     return conformantStatuses.some(conformantStatus => 
       normalizedStatus.includes(conformantStatus)

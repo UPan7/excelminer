@@ -185,8 +185,16 @@ const Index = () => {
                 const statusIndex = headers.findIndex(h => h && 
                   (h.toLowerCase().includes('assessment') && h.toLowerCase().includes('status')) ||
                   h.toLowerCase().includes('conformance') ||
-                  h.toLowerCase().includes('status')
+                  h.toLowerCase().includes('status') ||
+                  h.toLowerCase().includes('source') // Добавляем проверку для "Source of Smelter Identification Number"
                 );
+                
+                console.log('RMI индексы колонок:', {
+                  facilityIdIndex,
+                  nameIndex,
+                  metalIndex,
+                  statusIndex
+                });
                 
                 const facilityName = row[nameIndex] || '';
                 const status = row[statusIndex] || '';
