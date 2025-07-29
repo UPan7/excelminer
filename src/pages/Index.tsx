@@ -61,7 +61,27 @@ const Index = () => {
 
   useEffect(() => {
     loadDatabaseStatus();
+    loadAvailableMetals();
   }, []);
+
+  const loadAvailableMetals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reference_facilities')
+        .select('metal')
+        .not('metal', 'is', null);
+
+      if (error) throw error;
+
+      const uniqueMetals = [...new Set(data?.map(item => item.metal) || [])]
+        .filter(Boolean)
+        .sort();
+
+      setAvailableMetals(uniqueMetals);
+    } catch (error) {
+      console.error('Error loading available metals:', error);
+    }
+  };
 
   const loadDatabaseStatus = async () => {
     try {
@@ -69,17 +89,6 @@ const Index = () => {
         .rpc('get_reference_stats');
 
       if (statsError) throw statsError;
-
-      // Get unique metals from database
-      const { data: metalData, error: metalError } = await supabase
-        .from('reference_facilities')
-        .select('metal')
-        .not('metal', 'is', null);
-
-      if (metalError) throw metalError;
-
-      const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(Boolean))].sort();
-      setAvailableMetals(uniqueMetals);
 
       const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
       const isReady = totalRecords > 0;
