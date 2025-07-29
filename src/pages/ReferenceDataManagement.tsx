@@ -138,12 +138,30 @@ const ReferenceDataManagement = () => {
             if (index < row.length && row[index]) {
               let value = row[index].toString().trim();
               
-              // Handle date fields
+              // Handle date fields with proper validation
               if (field === 'dd_assessment_date' && value) {
                 // Try to parse Excel date or string date
-                const date = new Date(value);
-                if (!isNaN(date.getTime())) {
-                  facility[field] = date.toISOString().split('T')[0];
+                try {
+                  // If it's a number (Excel date), convert it
+                  if (!isNaN(Number(value))) {
+                    // Excel date conversion (days since 1900-01-01)
+                    const excelDate = Number(value);
+                    if (excelDate > 0 && excelDate < 100000) { // Reasonable date range
+                      const date = new Date((excelDate - 25569) * 86400 * 1000);
+                      if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
+                        facility[field] = date.toISOString().split('T')[0];
+                      }
+                    }
+                  } else {
+                    // Try to parse as regular date string
+                    const date = new Date(value);
+                    if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
+                      facility[field] = date.toISOString().split('T')[0];
+                    }
+                  }
+                } catch (error) {
+                  // Skip invalid dates
+                  console.warn('Invalid date value:', value);
                 }
               } else {
                 facility[field] = value;
