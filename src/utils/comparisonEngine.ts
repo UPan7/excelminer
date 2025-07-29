@@ -91,14 +91,20 @@ export class ComparisonEngine {
     const normalizedStatus = status.toLowerCase().trim();
     console.log('Проверка статуса:', normalizedStatus);
     
-    // Если статус пустой, но плавильня найдена в RMI списке, считаем ее соответствующей
-    if (!normalizedStatus) {
+    // Extract the actual status after the colon (remove standard prefix)
+    let actualStatus = status;
+    if (status.includes(':')) {
+      actualStatus = status.split(':')[1].trim();
+    }
+    
+    // If status is empty after cleaning, but smelter was found in RMI list, consider it conformant
+    if (!actualStatus) {
       console.log('Пустой статус, но плавильня найдена в RMI - считаем соответствующей');
       return true;
     }
     
     return conformantStatuses.some(conformantStatus => 
-      normalizedStatus.includes(conformantStatus)
+      actualStatus.toLowerCase().includes(conformantStatus)
     );
   }
 
@@ -111,7 +117,7 @@ export class ComparisonEngine {
       );
       if (idMatches.length > 0) {
         // Get all standards where this facility was found
-        const standards = [...new Set(idMatches.map(m => this.getStandardFromAssessmentStatus(m.assessmentStatus) || 'Unknown'))];
+        const standards = [...new Set(idMatches.map(m => this.getStandardFromAssessmentStatus(m.assessmentStatus)).filter(Boolean))] as string[];
         return { match: idMatches[0], standards };
       }
     }
@@ -127,7 +133,7 @@ export class ComparisonEngine {
     });
 
     if (nameMatches.length > 0) {
-      const standards = [...new Set(nameMatches.map(m => this.getStandardFromAssessmentStatus(m.assessmentStatus) || 'Unknown'))];
+      const standards = [...new Set(nameMatches.map(m => this.getStandardFromAssessmentStatus(m.assessmentStatus)).filter(Boolean))] as string[];
       return { match: nameMatches[0], standards };
     }
 
@@ -136,6 +142,12 @@ export class ComparisonEngine {
 
   private getStandardFromAssessmentStatus(status: string): string | null {
     const statusLower = status.toLowerCase();
+    // Check if the status starts with a standard name (from our modified format)
+    if (statusLower.startsWith('cmrt:')) return 'CMRT';
+    if (statusLower.startsWith('emrt:')) return 'EMRT';
+    if (statusLower.startsWith('amrt:')) return 'AMRT';
+    
+    // Fallback to checking content
     if (statusLower.includes('cmrt') || statusLower.includes('conflict minerals')) return 'CMRT';
     if (statusLower.includes('emrt') || statusLower.includes('extended minerals')) return 'EMRT';
     if (statusLower.includes('amrt') || statusLower.includes('aluminium')) return 'AMRT';
@@ -178,7 +190,7 @@ export class ComparisonEngine {
         const allMatches = metalFilteredData.filter(rmi => 
           this.normalizeString(rmi.standardFacilityName) === this.normalizeString(bestMatch.item.standardFacilityName)
         );
-        const standards = [...new Set(allMatches.map(m => this.getStandardFromAssessmentStatus(m.assessmentStatus) || 'Unknown'))];
+        const standards = [...new Set(allMatches.map(m => this.getStandardFromAssessmentStatus(m.assessmentStatus)).filter(Boolean))] as string[];
         
         return {
           match: bestMatch.item,
@@ -292,12 +304,21 @@ export class ComparisonEngine {
     // Calculate by standard
     const byStandard: { [standard: string]: { conformant: number; total: number; percentage: number } } = {};
     this.standardsUsed.forEach(standard => {
-      const standardResults = results.filter(r => r.matchedStandards?.includes(standard) || r.sourceStandard === standard);
-      const standardConformant = standardResults.filter(r => r.matchStatus === 'conformant').length;
+      // Count all results that were checked against this standard
+      const standardResults = results.filter(r => 
+        r.matchedStandards?.includes(standard) || 
+        r.sourceStandard === standard ||
+        // Also count results where we attempted to match against this standard
+        this.metalsChecked.some(metal => r.metal === metal)
+      );
+      const standardConformant = standardResults.filter(r => 
+        r.matchStatus === 'conformant' && 
+        (r.matchedStandards?.includes(standard) || r.sourceStandard === standard)
+      ).length;
       byStandard[standard] = {
         conformant: standardConformant,
-        total: standardResults.length,
-        percentage: standardResults.length > 0 ? Math.round((standardConformant / standardResults.length) * 100) : 0
+        total: results.filter(r => this.metalsChecked.includes(r.metal)).length, // Total results for this standard
+        percentage: results.length > 0 ? Math.round((standardConformant / results.length) * 100) : 0
       };
     });
 

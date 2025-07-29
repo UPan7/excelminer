@@ -335,18 +335,19 @@ const Index = () => {
     try {
       const { data: referenceData, error } = await supabase
         .from('reference_facilities')
-        .select('*')
+        .select('*, list_type')
         .in('list_type', settings.standards)
         .in('metal', settings.metals)
         .not('standard_smelter_name', 'is', null);
 
       if (error) throw error;
 
+      // Convert to RMI format for comparison engine with standard information
       const rmiData: RMIData[] = (referenceData || []).map(facility => ({
         facilityId: facility.smelter_id || '',
         standardFacilityName: facility.standard_smelter_name || '',
         metal: facility.metal || '',
-        assessmentStatus: facility.assessment_status || '',
+        assessmentStatus: `${facility.list_type}: ${facility.assessment_status || 'Conformant'}`, // Include standard in status
       }));
 
       const engine = createComparisonEngine(rmiData, settings.standards, settings.metals);
