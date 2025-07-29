@@ -164,7 +164,13 @@ const ReferenceDataManagement = () => {
       const rows = data.slice(1);
       
       console.log('CSV Headers found:', headers);
+      console.log('Headers length:', headers.length);
       console.log('Total rows to process:', rows.length);
+      
+      // Check if headers were parsed correctly (should have multiple columns)
+      if (headers.length < 3) {
+        throw new Error('CSV-Datei wurde nicht korrekt geparst. Bitte stellen Sie sicher, dass es sich um eine gültige CSV-Datei handelt.');
+      }
 
       // Map headers to database columns with more flexible matching
       const headerMapping = {
