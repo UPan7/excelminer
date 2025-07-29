@@ -427,9 +427,10 @@ const Index = () => {
   };
 
   const selectAllMetals = () => {
+    const filteredMetals = ['Gold', 'Tin', 'Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal));
     setSettings({
       ...settings,
-      metals: [...availableMetals]
+      metals: [...filteredMetals]
     });
   };
 
@@ -526,15 +527,6 @@ const Index = () => {
                   ))}
                 </div>
                 
-                {/* Metal counts summary */}
-                {availableMetals.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm font-medium mb-2">Verfügbare Metalle:</p>
-                    <p className="text-sm text-muted-foreground">
-                      {availableMetals.join(' | ')}
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -593,7 +585,7 @@ const Index = () => {
                         variant="outline" 
                         size="sm" 
                         onClick={selectAllMetals}
-                        disabled={settings.metals.length === availableMetals.length}
+                        disabled={settings.metals.length === ['Gold', 'Tin', 'Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal)).length}
                       >
                         Alle auswählen
                       </Button>
@@ -609,7 +601,7 @@ const Index = () => {
                   </div>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {availableMetals.map(metal => (
+                    {['Gold', 'Tin', 'Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal)).map(metal => (
                       <div key={metal} className="flex items-center space-x-2">
                         <Checkbox
                           id={`metal-${metal}`}
