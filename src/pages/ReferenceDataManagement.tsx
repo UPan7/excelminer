@@ -38,6 +38,13 @@ const ReferenceDataManagement = () => {
   const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
+  // All hooks must be called before any conditional returns
+  useEffect(() => {
+    if (user) {
+      loadReferenceData();
+    }
+  }, [user]);
+
   // Redirect to auth if not authenticated
   if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
@@ -54,10 +61,6 @@ const ReferenceDataManagement = () => {
       </div>
     );
   }
-
-  useEffect(() => {
-    loadReferenceData();
-  }, []);
 
   const loadReferenceData = async () => {
     try {
