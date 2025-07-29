@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ComparisonResults, type ComparisonResult, type ComparisonSummary } from '@/components/ComparisonResults';
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
+import ComparisonOptions from '@/components/ComparisonOptions';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SupplierFileData {
@@ -404,41 +405,6 @@ const Index = () => {
     }
   };
 
-  const handleStandardChange = (standard: string, checked: boolean) => {
-    const newStandards = checked 
-      ? [...settings.standards, standard]
-      : settings.standards.filter(s => s !== standard);
-    
-    setSettings({
-      ...settings,
-      standards: newStandards
-    });
-  };
-
-  const handleMetalChange = (metal: string, checked: boolean) => {
-    const newMetals = checked
-      ? [...settings.metals, metal]
-      : settings.metals.filter(m => m !== metal);
-    
-    setSettings({
-      ...settings,
-      metals: newMetals
-    });
-  };
-
-  const selectAllMetals = () => {
-    setSettings({
-      ...settings,
-      metals: [...availableMetals]
-    });
-  };
-
-  const deselectAllMetals = () => {
-    setSettings({
-      ...settings,
-      metals: []
-    });
-  };
 
   const formatDate = (dateString?: string) => {
     return dateString ? new Date(dateString).toLocaleDateString('de-DE') : 'Nicht geladen';
@@ -484,156 +450,11 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Database Status */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      {dbStatus.isReady ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                      )}
-                      Referenzdatenbank Status
-                    </CardTitle>
-                    <CardDescription>
-                      {dbStatus.isReady 
-                        ? `Datenbank bereit • ${dbStatus.totalRecords.toLocaleString()} Einträge`
-                        : 'Referenzdaten müssen geladen werden'
-                      }
-                    </CardDescription>
-                  </div>
-                  <Badge variant={dbStatus.isReady ? "default" : "secondary"}>
-                    {dbStatus.isReady ? "✓ Bereit" : "⚠️ Update erforderlich"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {dbStatus.details.map(detail => (
-                    <div key={detail.type} className="text-center space-y-1">
-                      <p className="font-medium">{detail.type}</p>
-                      <p className="text-2xl font-bold text-primary">
-                        {detail.count.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(detail.lastUpdated)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Metal counts summary */}
-                {availableMetals.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm font-medium mb-2">Verfügbare Metalle:</p>
-                    <p className="text-sm text-muted-foreground">
-                      {availableMetals.join(' | ')}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Comparison Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Vergleichsparameter
-                </CardTitle>
-                <CardDescription>
-                  Wählen Sie Standards und Metalle für die Prüfung aus
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="space-y-6">
-                {/* Standards Selection */}
-                <div className="space-y-3">
-                  <Label className="text-base font-medium">Standards für Vergleich</Label>
-                  <div className="grid grid-cols-3 gap-4">
-                    {AVAILABLE_STANDARDS.map(standard => (
-                      <div key={standard} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`standard-${standard}`}
-                          checked={settings.standards.includes(standard)}
-                          onCheckedChange={(checked) => handleStandardChange(standard, checked === true)}
-                          disabled={!dbStatus.details.find(d => d.type === standard)?.count}
-                        />
-                        <Label 
-                          htmlFor={`standard-${standard}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {standard}
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            ({dbStatus.details.find(d => d.type === standard)?.count || 0})
-                          </span>
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {settings.standards.length === 0 && (
-                    <p className="text-sm text-amber-600">
-                      ⚠️ Wählen Sie mindestens einen Standard aus
-                    </p>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Metals Selection */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-base font-medium">Metalle für Prüfung</Label>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={selectAllMetals}
-                        disabled={settings.metals.length === availableMetals.length}
-                      >
-                        Alle auswählen
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={deselectAllMetals}
-                        disabled={settings.metals.length === 0}
-                      >
-                        Alle abwählen
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {availableMetals.map(metal => (
-                      <div key={metal} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`metal-${metal}`}
-                          checked={settings.metals.includes(metal)}
-                          onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
-                        />
-                        <Label 
-                          htmlFor={`metal-${metal}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {metal}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {settings.metals.length === 0 && (
-                    <p className="text-sm text-amber-600">
-                      ⚠️ Wählen Sie mindestens ein Metall aus
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <ComparisonOptions 
+            onSettingsChange={setSettings}
+            settings={settings}
+            availableMetals={availableMetals}
+          />
 
           {/* File Upload and Control */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
