@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reference_facilities: {
         Row: {
           assessment_status: string | null
@@ -120,6 +147,10 @@ export type Database = {
           metal_counts: Json
           last_updated: string
         }[]
+      }
+      get_user_role: {
+        Args: { user_uuid: string }
+        Returns: string
       }
     }
     Enums: {
