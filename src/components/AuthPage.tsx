@@ -61,7 +61,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       if (error) {
         toast({
-          title: "Sign in failed",
+          title: "Anmeldung fehlgeschlagen",
           description: error.message,
           variant: "destructive",
         });
@@ -70,15 +70,15 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       if (data.user && data.session) {
         toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in.",
+          title: "Willkommen zurück!",
+          description: "Sie haben sich erfolgreich angemeldet.",
         });
         onAuthSuccess(data.user, data.session);
       }
     } catch (error) {
       toast({
-        title: "An error occurred",
-        description: "Please try again later.",
+        title: "Ein Fehler ist aufgetreten",
+        description: "Bitte versuchen Sie es später erneut.",
         variant: "destructive",
       });
     } finally {
@@ -103,7 +103,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       if (error) {
         toast({
-          title: "Sign up failed",
+          title: "Registrierung fehlgeschlagen",
           description: error.message,
           variant: "destructive",
         });
@@ -112,14 +112,14 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       if (data.user) {
         toast({
-          title: "Account created!",
-          description: "Please check your email to verify your account.",
+          title: "Konto erstellt!",
+          description: "Bitte überprüfen Sie Ihre E-Mail, um Ihr Konto zu bestätigen.",
         });
       }
     } catch (error) {
       toast({
-        title: "An error occurred",
-        description: "Please try again later.",
+        title: "Ein Fehler ist aufgetreten",
+        description: "Bitte versuchen Sie es später erneut.",
         variant: "destructive",
       });
     } finally {
@@ -136,38 +136,38 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           </div>
           <CardTitle className="text-2xl font-bold">RMI Compliance Portal</CardTitle>
           <CardDescription>
-            Sign in to access reference data management
+            Anmelden für Zugriff auf Referenzdatenverwaltung
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="signin">Anmelden</TabsTrigger>
+              <TabsTrigger value="signup">Registrieren</TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
+                  <Label htmlFor="signin-email">E-Mail</Label>
                   <Input
                     id="signin-email"
                     name="email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder="E-Mail eingeben"
                     value={formData.email}
                     onChange={handleInputChange}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
+                  <Label htmlFor="signin-password">Passwort</Label>
                   <div className="relative">
                     <Input
                       id="signin-password"
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder="Passwort eingeben"
                       value={formData.password}
                       onChange={handleInputChange}
                       required
@@ -188,7 +188,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                   </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoading ? "Anmelden..." : "Anmelden"}
                 </Button>
               </form>
             </TabsContent>
@@ -196,25 +196,25 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">E-Mail</Label>
                   <Input
                     id="signup-email"
                     name="email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder="E-Mail eingeben"
                     value={formData.email}
                     onChange={handleInputChange}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password">Passwort</Label>
                   <div className="relative">
                     <Input
                       id="signup-password"
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Create a password"
+                      placeholder="Passwort erstellen"
                       value={formData.password}
                       onChange={handleInputChange}
                       required
@@ -235,11 +235,11 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Password must be at least 6 characters long
+                    Passwort muss mindestens 6 Zeichen lang sein
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Creating account..." : "Create Account"}
+                  {isLoading ? "Konto wird erstellt..." : "Konto erstellen"}
                 </Button>
               </form>
             </TabsContent>
