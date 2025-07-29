@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ComparisonResults, type ComparisonResult } from '@/components/ComparisonResults';
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
+import Navigation from '@/components/Navigation';
 
 interface FileData {
   id: string;
@@ -472,7 +473,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <>
+      <Navigation />
+      <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -638,7 +641,8 @@ const Index = () => {
           isProcessing={isComparing}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

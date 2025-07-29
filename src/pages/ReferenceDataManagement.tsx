@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 
@@ -371,62 +372,68 @@ const ReferenceDataManagement = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground">Загрузка данных...</p>
+      <>
+        <Navigation />
+        <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground">Загрузка данных...</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">
-            Управление эталонными данными
-          </h1>
-          <p className="text-muted-foreground">
-            Загрузка и управление эталонными списками RMI для CMRT, EMRT и AMRT
-          </p>
-        </div>
+    <>
+      <Navigation />
+      <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-4xl font-bold text-foreground">
+              Управление эталонными данными
+            </h1>
+            <p className="text-muted-foreground">
+              Загрузка и управление эталонными списками RMI для CMRT, EMRT и AMRT
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {renderReferenceSection('CMRT')}
-          {renderReferenceSection('EMRT')}
-          {renderReferenceSection('AMRT')}
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {renderReferenceSection('CMRT')}
+            {renderReferenceSection('EMRT')}
+            {renderReferenceSection('AMRT')}
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Общая статистика</CardTitle>
-            <CardDescription>
-              Сводная информация по всем эталонным спискам
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {stats.map(stat => (
-                <div key={stat.list_type} className="text-center space-y-2">
-                  <h3 className="font-semibold">{stat.list_type}</h3>
-                  <p className="text-2xl font-bold text-primary">
-                    {stat.total_facilities.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {stat.last_updated ? `Обновлено: ${formatDate(stat.last_updated)}` : 'Не загружено'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Общая статистика</CardTitle>
+              <CardDescription>
+                Сводная информация по всем эталонным спискам
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {stats.map(stat => (
+                  <div key={stat.list_type} className="text-center space-y-2">
+                    <h3 className="font-semibold">{stat.list_type}</h3>
+                    <p className="text-2xl font-bold text-primary">
+                      {stat.total_facilities.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {stat.last_updated ? `Обновлено: ${formatDate(stat.last_updated)}` : 'Не загружено'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
