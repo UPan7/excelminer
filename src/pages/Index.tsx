@@ -70,11 +70,12 @@ const Index = () => {
 
       if (statsError) throw statsError;
 
-      // Get unique metals from database
+      // Get unique metals from database efficiently
       const { data: metalData, error: metalError } = await supabase
         .from('reference_facilities')
-        .select('metal')
-        .not('metal', 'is', null);
+        .select('metal', { count: 'exact' })
+        .not('metal', 'is', null)
+        .order('metal');
 
       if (metalError) throw metalError;
 
