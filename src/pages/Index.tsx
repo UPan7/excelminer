@@ -29,30 +29,92 @@ const Index = () => {
   const detectFileType = (filename: string): 'cmrt' | 'rmi' | 'unknown' => {
     const lower = filename.toLowerCase();
     if (lower.includes('cmrt') || lower.includes('emrt')) return 'cmrt';
-    if (lower.includes('rmi') || lower.includes('conformant')) return 'rmi';
+    if (lower.includes('rmi') || lower.includes('conformant') || lower.endsWith('.csv')) return 'rmi';
     return 'unknown';
   };
 
-  const parseExcelFile = async (file: File): Promise<{ cmrtData?: CMRTData[], rmiData?: RMIData[] }> => {
+  const parseCSVFile = (text: string): string[][] => {
+    const lines = text.split('\n');
+    const result: string[][] = [];
+    
+    for (const line of lines) {
+      if (line.trim()) {
+        // Простой парсер CSV с поддержкой кавычек
+        const fields: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            fields.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        
+        fields.push(current.trim());
+        result.push(fields);
+      }
+    }
+    
+    return result;
+  };
+
+  const parseFile = async (file: File): Promise<{ cmrtData?: CMRTData[], rmiData?: RMIData[] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      const fileType = detectFileType(file.name);
+      const isCSV = file.name.toLowerCase().endsWith('.csv');
+      
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          let jsonData: any[][];
           
-          const fileType = detectFileType(file.name);
-          
-          if (fileType === 'cmrt') {
-            // Parse CMRT file - look for "Smelter List" sheet
-            let worksheet = workbook.Sheets['Smelter List'];
-            if (!worksheet) {
-              // If "Smelter List" sheet not found, try first sheet
-              worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          if (isCSV) {
+            // Парсинг CSV файла
+            const text = e.target?.result as string;
+            jsonData = parseCSVFile(text);
+            console.log('CSV первые 10 строк:', jsonData.slice(0, 10));
+          } else {
+            // Парсинг Excel файла
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            let worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            if (fileType === 'cmrt') {
+              // Parse CMRT file - look for "Smelter List" sheet
+              worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
+            } else if (fileType === 'rmi') {
+              // Проверяем все листы на наличие данных о плавильнях
+              for (const sheetName of workbook.SheetNames) {
+                const sheet = workbook.Sheets[sheetName];
+                const testData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                const hasRmiData = testData.some((row: any) => 
+                  row.some((cell: any) => 
+                    typeof cell === 'string' && 
+                    (cell.toLowerCase().includes('facility') || 
+                     cell.toLowerCase().includes('conformance') ||
+                     cell.toLowerCase().includes('assessment'))
+                  )
+                );
+                if (hasRmiData) {
+                  worksheet = sheet;
+                  break;
+                }
+              }
             }
             
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            console.log('CMRT первые 10 строк:', jsonData.slice(0, 10));
+            jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            console.log('Excel первые 10 строк:', jsonData.slice(0, 10));
+          }
+          
+          if (fileType === 'cmrt') {
             
             // В CMRT файлах заголовки обычно в строке 4 (индекс 3)
             let headerRowIndex = 3;
@@ -127,29 +189,6 @@ const Index = () => {
             
             resolve({ cmrtData });
           } else if (fileType === 'rmi') {
-            // Parse RMI facility list - ищем правильный лист
-            let worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            
-            // Проверяем все листы на наличие данных о плавильнях
-            for (const sheetName of workbook.SheetNames) {
-              const sheet = workbook.Sheets[sheetName];
-              const testData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-              const hasRmiData = testData.some((row: any) => 
-                row.some((cell: any) => 
-                  typeof cell === 'string' && 
-                  (cell.toLowerCase().includes('facility') || 
-                   cell.toLowerCase().includes('conformance') ||
-                   cell.toLowerCase().includes('assessment'))
-                )
-              );
-              if (hasRmiData) {
-                worksheet = sheet;
-                break;
-              }
-            }
-            
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            console.log('RMI первые 10 строк:', jsonData.slice(0, 10));
             
             const headerRowIndex = jsonData.findIndex((row: any) => 
               row.some((cell: any) => 
@@ -223,7 +262,12 @@ const Index = () => {
         }
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
+      
+      if (isCSV) {
+        reader.readAsText(file, 'utf-8');
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
     });
   };
 
@@ -233,7 +277,7 @@ const Index = () => {
     ));
 
     try {
-      const parsedData = await parseExcelFile(file);
+      const parsedData = await parseFile(file);
       
       setFiles(prev => prev.map(f => 
         f.id === fileData.id 
@@ -460,10 +504,10 @@ const Index = () => {
               <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <div className="space-y-2">
                 <p className="text-lg font-medium">
-                  Drag and drop your Excel files here
+                  Drag and drop your Excel or CSV files here
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports .xlsx files • CMRT, EMRT, and RMI facility lists
+                  Supports .xlsx, .xls, and .csv files • CMRT, EMRT, and RMI facility lists
                 </p>
                 <div className="pt-4">
                   <Button asChild>
@@ -475,7 +519,7 @@ const Index = () => {
                     id="file-upload"
                     type="file"
                     multiple
-                    accept=".xlsx,.xls"
+                    accept=".xlsx,.xls,.csv"
                     onChange={handleFileInput}
                     className="hidden"
                   />
