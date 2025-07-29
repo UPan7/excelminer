@@ -21,16 +21,33 @@ export interface ComparisonResult {
   confidenceScore?: number;
   matchedFacilityName?: string;
   matchedFacilityId?: string;
+  matchedStandards?: string[];
+  sourceStandard?: string;
+}
+
+export interface ComparisonSummary {
+  totalChecked: number;
+  standardsUsed: string[];
+  metalsChecked: string[];
+  conformant: number;
+  nonConformant: number;
+  unknown: number;
+  pending: number;
+  conformantPercentage: number;
+  byMetal: { [metal: string]: { conformant: number; total: number; percentage: number } };
+  byStandard: { [standard: string]: { conformant: number; total: number; percentage: number } };
 }
 
 interface ComparisonResultsProps {
   results: ComparisonResult[];
   isProcessing: boolean;
+  summary?: ComparisonSummary;
 }
 
 export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
   results,
-  isProcessing
+  isProcessing,
+  summary
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -121,13 +138,13 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
   const getStatusBadge = (status: ComparisonResult['matchStatus']) => {
     switch (status) {
       case 'conformant':
-        return <Badge className="bg-green-600 hover:bg-green-700">Conformant</Badge>;
+        return <Badge className="bg-green-600 hover:bg-green-700">Konform</Badge>;
       case 'non-conformant':
-        return <Badge variant="destructive">Non-Conformant</Badge>;
+        return <Badge variant="destructive">Nicht-konform</Badge>;
       case 'unknown':
-        return <Badge className="bg-orange-600 hover:bg-orange-700">Unknown</Badge>;
+        return <Badge className="bg-orange-600 hover:bg-orange-700">Unbekannt</Badge>;
       case 'pending-verification':
-        return <Badge className="bg-yellow-600 hover:bg-yellow-700">Pending Verification</Badge>;
+        return <Badge className="bg-yellow-600 hover:bg-yellow-700">Überprüfung</Badge>;
     }
   };
 
@@ -176,11 +193,86 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Detailed Summary Card */}
+      {summary && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Vergleichszusammenfassung
+            </CardTitle>
+            <CardDescription>
+              Geprüft: {summary.totalChecked} Schmelzen | 
+              Standards: {summary.standardsUsed.join(', ')} | 
+              Metalle: {summary.metalsChecked.join(', ')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Overall Stats */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Gesamtergebnis</h4>
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Konform:</span>
+                    <span className="text-sm font-medium text-green-600">
+                      {summary.conformant} ({summary.conformantPercentage}%)
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Nicht-konform:</span>
+                    <span className="text-sm font-medium text-red-600">{summary.nonConformant}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Unbekannt:</span>
+                    <span className="text-sm font-medium text-orange-600">{summary.unknown}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Überprüfung:</span>
+                    <span className="text-sm font-medium text-yellow-600">{summary.pending}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* By Metal */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Nach Metall</h4>
+                <div className="space-y-1">
+                  {Object.entries(summary.byMetal).map(([metal, stats]) => (
+                    <div key={metal} className="flex justify-between">
+                      <span className="text-sm">{metal}:</span>
+                      <span className="text-sm font-medium">
+                        {stats.conformant}/{stats.total} ({stats.percentage}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* By Standard */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Nach Standard</h4>
+                <div className="space-y-1">
+                  {Object.entries(summary.byStandard).map(([standard, stats]) => (
+                    <div key={standard} className="flex justify-between">
+                      <span className="text-sm">{standard}:</span>
+                      <span className="text-sm font-medium">
+                        {stats.conformant}/{stats.total} ({stats.percentage}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Smelters</CardTitle>
+            <CardTitle className="text-sm font-medium">Gesamte Schmelzen</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -189,7 +281,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Conformant</CardTitle>
+            <CardTitle className="text-sm font-medium">Konform</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.conformant}</div>
@@ -199,7 +291,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Non-Conformant</CardTitle>
+            <CardTitle className="text-sm font-medium">Nicht-konform</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{stats.nonConformant}</div>
@@ -208,7 +300,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Unknown</CardTitle>
+            <CardTitle className="text-sm font-medium">Unbekannt</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{stats.unknown}</div>
@@ -217,7 +309,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+            <CardTitle className="text-sm font-medium">Überprüfung</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
@@ -230,14 +322,14 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Comparison Results</CardTitle>
+              <CardTitle>Vergleichsergebnisse</CardTitle>
               <CardDescription>
-                {filteredAndSortedResults.length} of {results.length} smelters
+                {filteredAndSortedResults.length} von {results.length} Schmelzen
               </CardDescription>
             </div>
             <Button onClick={exportToExcel} variant="outline">
               <Download className="h-4 w-4 mr-2" />
-              Export Excel
+              Excel exportieren
             </Button>
           </div>
 
@@ -246,7 +338,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search smelters..."
+                placeholder="Schmelzen suchen..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -255,23 +347,23 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="All statuses" />
+                <SelectValue placeholder="Alle Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="conformant">Conformant</SelectItem>
-                <SelectItem value="non-conformant">Non-Conformant</SelectItem>
-                <SelectItem value="unknown">Unknown</SelectItem>
-                <SelectItem value="pending-verification">Pending Review</SelectItem>
+                <SelectItem value="all">Alle Status</SelectItem>
+                <SelectItem value="conformant">Konform</SelectItem>
+                <SelectItem value="non-conformant">Nicht-konform</SelectItem>
+                <SelectItem value="unknown">Unbekannt</SelectItem>
+                <SelectItem value="pending-verification">Überprüfung</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={metalFilter} onValueChange={setMetalFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="All metals" />
+                <SelectValue placeholder="Alle Metalle" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All metals</SelectItem>
+                <SelectItem value="all">Alle Metalle</SelectItem>
                 {uniqueMetals.map(metal => (
                   <SelectItem key={metal} value={metal}>{metal}</SelectItem>
                 ))}
@@ -280,10 +372,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="All suppliers" />
+                <SelectValue placeholder="Alle Lieferanten" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All suppliers</SelectItem>
+                <SelectItem value="all">Alle Lieferanten</SelectItem>
                 {uniqueSuppliers.map(supplier => (
                   <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
                 ))}
@@ -300,7 +392,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               }}
             >
               <Filter className="h-4 w-4 mr-2" />
-              Clear
+              Löschen
             </Button>
           </div>
         </CardHeader>
@@ -315,25 +407,25 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('supplierName')}
                   >
-                    Supplier
+                    Lieferant
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('smelterName')}
                   >
-                    Smelter Name
+                    Schmelzname
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('metal')}
                   >
-                    Metal
+                    Metall
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('country')}
                   >
-                    Country
+                    Land
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
@@ -341,7 +433,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                   >
                     Status
                   </TableHead>
-                  <TableHead>Confidence</TableHead>
+                  <TableHead>Vertrauen</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -389,19 +481,24 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                           <div className="p-4 space-y-2">
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <span className="font-medium">Smelter ID:</span> {result.smelterIdentificationNumber || 'N/A'}
+                                <span className="font-medium">Schmelz-ID:</span> {result.smelterIdentificationNumber || 'N/A'}
                               </div>
                               <div>
-                                <span className="font-medium">RMI Assessment:</span> {result.rmiAssessmentStatus || 'N/A'}
+                                <span className="font-medium">RMI-Bewertung:</span> {result.rmiAssessmentStatus || 'N/A'}
                               </div>
                               {result.matchedFacilityName && (
                                 <div>
-                                  <span className="font-medium">Matched Facility:</span> {result.matchedFacilityName}
+                                  <span className="font-medium">Gefundene Einrichtung:</span> {result.matchedFacilityName}
                                 </div>
                               )}
                               {result.matchedFacilityId && (
                                 <div>
-                                  <span className="font-medium">Matched Facility ID:</span> {result.matchedFacilityId}
+                                  <span className="font-medium">Gefundene Einrichtungs-ID:</span> {result.matchedFacilityId}
+                                </div>
+                              )}
+                              {result.matchedStandards && result.matchedStandards.length > 0 && (
+                                <div>
+                                  <span className="font-medium">Gefunden in Standards:</span> {result.matchedStandards.join(', ')}
                                 </div>
                               )}
                             </div>

@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { ComparisonResults, type ComparisonResult } from '@/components/ComparisonResults';
+import { ComparisonResults, type ComparisonResult, type ComparisonSummary } from '@/components/ComparisonResults';
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +56,7 @@ const Index = () => {
     details: []
   });
   const [availableMetals, setAvailableMetals] = useState<string[]>([]);
+  const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | undefined>(undefined);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -348,7 +349,7 @@ const Index = () => {
         assessmentStatus: facility.assessment_status || '',
       }));
 
-      const engine = createComparisonEngine(rmiData);
+      const engine = createComparisonEngine(rmiData, settings.standards, settings.metals);
       const allResults: ComparisonResult[] = [];
       
       for (const supplierFile of completeFiles) {
@@ -363,7 +364,9 @@ const Index = () => {
         }
       }
 
+      const summary = engine.getComparisonSummary(allResults);
       setComparisonResults(allResults);
+      setComparisonSummary(summary);
 
       toast({
         title: "Vergleich abgeschlossen",
@@ -385,6 +388,7 @@ const Index = () => {
   const clearAllFiles = () => {
     setSupplierFiles([]);
     setComparisonResults([]);
+    setComparisonSummary(undefined);
     toast({
       title: "Dateien gelöscht",
       description: "Alle hochgeladenen Dateien wurden entfernt.",
@@ -395,6 +399,7 @@ const Index = () => {
     setSupplierFiles(prev => prev.filter(f => f.id !== fileId));
     if (comparisonResults.length > 0) {
       setComparisonResults([]);
+      setComparisonSummary(undefined);
     }
   };
 
@@ -814,7 +819,7 @@ const Index = () => {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <ComparisonResults results={comparisonResults} isProcessing={isComparing} />
+              <ComparisonResults results={comparisonResults} isProcessing={isComparing} summary={comparisonSummary} />
             </div>
           )}
         </div>
