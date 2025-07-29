@@ -14,13 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      reference_facilities: {
+        Row: {
+          assessment_status: string | null
+          country_location: string | null
+          created_at: string
+          dd_assessment_cycle: string | null
+          dd_assessment_date: string | null
+          dd_assessment_scheme: string | null
+          id: string
+          list_type: string
+          metal: string | null
+          operational_status: string | null
+          reassessment_in_progress: string | null
+          rmi_cross_recognition: string | null
+          smelter_id: string | null
+          standard_smelter_name: string | null
+          state_province_region: string | null
+          supply_chain_level: string | null
+          updated_at: string
+        }
+        Insert: {
+          assessment_status?: string | null
+          country_location?: string | null
+          created_at?: string
+          dd_assessment_cycle?: string | null
+          dd_assessment_date?: string | null
+          dd_assessment_scheme?: string | null
+          id?: string
+          list_type: string
+          metal?: string | null
+          operational_status?: string | null
+          reassessment_in_progress?: string | null
+          rmi_cross_recognition?: string | null
+          smelter_id?: string | null
+          standard_smelter_name?: string | null
+          state_province_region?: string | null
+          supply_chain_level?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assessment_status?: string | null
+          country_location?: string | null
+          created_at?: string
+          dd_assessment_cycle?: string | null
+          dd_assessment_date?: string | null
+          dd_assessment_scheme?: string | null
+          id?: string
+          list_type?: string
+          metal?: string | null
+          operational_status?: string | null
+          reassessment_in_progress?: string | null
+          rmi_cross_recognition?: string | null
+          smelter_id?: string | null
+          standard_smelter_name?: string | null
+          state_province_region?: string | null
+          supply_chain_level?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reference_lists: {
+        Row: {
+          created_at: string
+          id: string
+          record_count: number
+          type: string
+          updated_at: string
+          upload_date: string
+          uploaded_by: string | null
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          record_count?: number
+          type: string
+          updated_at?: string
+          upload_date?: string
+          uploaded_by?: string | null
+          version: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          record_count?: number
+          type?: string
+          updated_at?: string
+          upload_date?: string
+          uploaded_by?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_reference_stats: {
+        Args: { list_type_param?: string }
+        Returns: {
+          list_type: string
+          total_facilities: number
+          metal_counts: Json
+          last_updated: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
