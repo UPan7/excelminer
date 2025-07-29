@@ -216,16 +216,22 @@ const ReferenceDataManagement = () => {
 
       setUploadProgress(prev => ({ ...prev, [listType]: 90 }));
 
-      // Update reference list metadata
-      const { error: upsertError } = await supabase
+      // Delete existing reference list metadata first
+      await supabase
         .from('reference_lists')
-        .upsert({
+        .delete()
+        .eq('type', listType);
+
+      // Insert new reference list metadata
+      const { error: insertError } = await supabase
+        .from('reference_lists')
+        .insert({
           type: listType,
           version: new Date().toISOString().split('T')[0],
           record_count: facilities.length,
         });
 
-      if (upsertError) throw upsertError;
+      if (insertError) throw insertError;
 
       setUploadProgress(prev => ({ ...prev, [listType]: 100 }));
 
