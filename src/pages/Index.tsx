@@ -288,11 +288,11 @@ const Index = () => {
       ));
 
       toast({
-        title: "File processed successfully",
-        description: `${file.name} has been parsed and data extracted.`,
+        title: "Datei erfolgreich verarbeitet",
+        description: `${file.name} wurde geparst und Daten extrahiert.`,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
       
       setFiles(prev => prev.map(f => 
         f.id === fileData.id 
@@ -302,7 +302,7 @@ const Index = () => {
 
       toast({
         variant: "destructive",
-        title: "Processing failed",
+        title: "Verarbeitung fehlgeschlagen",
         description: errorMessage,
       });
     }
@@ -483,14 +483,14 @@ const Index = () => {
           <div className="text-center space-y-2 flex-1">
             <h1 className="text-4xl font-bold text-foreground">CMRT/EMRT Compliance Checker</h1>
             <p className="text-xl text-muted-foreground">
-              Upload and process mineral supply chain reports to validate compliance
+              Upload und Verarbeitung von Mineralien-Lieferketten-Berichten zur Validierung der Compliance
             </p>
           </div>
           <div className="flex gap-2">
             <Button asChild variant="outline">
               <Link to="/auth" className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                Admin Login
+                Admin-Anmeldung
               </Link>
             </Button>
           </div>
@@ -499,9 +499,9 @@ const Index = () => {
         {/* Upload Zone */}
         <Card>
           <CardHeader>
-            <CardTitle>Upload Files</CardTitle>
+            <CardTitle>Dateien hochladen</CardTitle>
             <CardDescription>
-              Drop your CMRT/EMRT reports and RMI conformant facility lists here
+              Ziehen Sie Ihre CMRT/EMRT-Berichte und RMI-konforme Anlagenlisten hier hinein
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -518,15 +518,15 @@ const Index = () => {
               <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <div className="space-y-2">
                 <p className="text-lg font-medium">
-                  Drag and drop your Excel or CSV files here
+                  Ziehen Sie Ihre Excel- oder CSV-Dateien hierher
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports .xlsx, .xls, and .csv files • CMRT, EMRT, and RMI facility lists
+                  Unterstützt .xlsx, .xls und .csv Dateien • CMRT, EMRT und RMI-Anlagenlisten
                 </p>
                 <div className="pt-4">
                   <Button asChild>
                     <label htmlFor="file-upload" className="cursor-pointer">
-                      Choose Files
+                      Dateien auswählen
                     </label>
                   </Button>
                   <input
@@ -548,13 +548,13 @@ const Index = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Uploaded Files</CardTitle>
+                <CardTitle>Hochgeladene Dateien</CardTitle>
                 <CardDescription>
-                  {files.length} file{files.length !== 1 ? 's' : ''} uploaded
+                  {files.length} Datei{files.length !== 1 ? 'en' : ''} hochgeladen
                 </CardDescription>
               </div>
               <Button variant="outline" onClick={clearAllFiles}>
-                Clear All
+                Alle löschen
               </Button>
             </CardHeader>
             <CardContent>
@@ -580,7 +580,7 @@ const Index = () => {
                         )}
                         {file.status === 'complete' && file.data && (
                           <p className="text-sm text-green-600 mt-1">
-                            {file.data.cmrtData?.length || file.data.rmiData?.length || 0} records extracted
+                            {file.data.cmrtData?.length || file.data.rmiData?.length || 0} Datensätze extrahiert
                           </p>
                         )}
                       </div>
@@ -603,9 +603,9 @@ const Index = () => {
         {files.some(f => f.status === 'complete') && (
           <Card>
             <CardHeader>
-              <CardTitle>Run Comparison</CardTitle>
+              <CardTitle>Vergleich durchführen</CardTitle>
               <CardDescription>
-                Compare uploaded CMRT files against RMI conformant facility lists
+                Vergleichen Sie hochgeladene CMRT-Dateien mit RMI-konformen Anlagenlisten
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -620,7 +620,7 @@ const Index = () => {
                   ) : (
                     <Play className="h-4 w-4" />
                   )}
-                  {isComparing ? 'Processing...' : 'Process Files'}
+                  {isComparing ? 'Verarbeitung...' : 'Dateien verarbeiten'}
                 </Button>
                 
                 {comparisonResults.length > 0 && (
@@ -629,17 +629,17 @@ const Index = () => {
                     onClick={() => setComparisonResults([])}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
-                    Clear Results
+                    Ergebnisse löschen
                   </Button>
                 )}
               </div>
               
               <div className="mt-4 text-sm text-muted-foreground">
                 <p>
-                  <strong>CMRT files:</strong> {files.filter(f => f.type === 'cmrt' && f.status === 'complete').length} ready
+                  <strong>CMRT-Dateien:</strong> {files.filter(f => f.type === 'cmrt' && f.status === 'complete').length} bereit
                 </p>
                 <p>
-                  <strong>RMI files:</strong> {files.filter(f => f.type === 'rmi' && f.status === 'complete').length} ready
+                  <strong>RMI-Dateien:</strong> {files.filter(f => f.type === 'rmi' && f.status === 'complete').length} bereit
                 </p>
               </div>
             </CardContent>

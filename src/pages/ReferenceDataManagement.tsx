@@ -56,7 +56,7 @@ const ReferenceDataManagement = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-2">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Проверка авторизации...</p>
+          <p className="text-muted-foreground">Autorisierung prüfen...</p>
         </div>
       </div>
     );
@@ -85,8 +85,8 @@ const ReferenceDataManagement = () => {
     } catch (error) {
       console.error('Error loading reference data:', error);
       toast({
-        title: "Ошибка загрузки",
-        description: "Не удалось загрузить данные эталонных списков",
+        title: "Ladefehler",
+        description: "Referenzdaten konnten nicht geladen werden",
         variant: "destructive",
       });
     } finally {
@@ -107,7 +107,7 @@ const ReferenceDataManagement = () => {
       const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
 
       if (data.length < 2) {
-        throw new Error('Файл должен содержать заголовки и данные');
+        throw new Error('Datei muss Kopfzeilen und Daten enthalten');
       }
 
       const headers = data[0];
@@ -237,7 +237,7 @@ const ReferenceDataManagement = () => {
       
       if (filteredFacilities.length === 0) {
         console.error('No valid facilities found. Check header mapping and data format.');
-        throw new Error('В файле не найдено валидных записей. Проверьте формат данных и заголовки.');
+        throw new Error('Keine gültigen Datensätze in der Datei gefunden. Bitte prüfen Sie das Datenformat und die Kopfzeilen.');
       }
 
       setUploadProgress(prev => ({ ...prev, [listType]: 60 }));
@@ -280,8 +280,8 @@ const ReferenceDataManagement = () => {
       setUploadProgress(prev => ({ ...prev, [listType]: 100 }));
 
       toast({
-        title: "Успешно загружено",
-        description: `Загружено ${filteredFacilities.length} записей для ${listType}`,
+        title: "Erfolgreich hochgeladen",
+        description: `${filteredFacilities.length} Datensätze für ${listType} hochgeladen`,
       });
 
       // Reload data
@@ -290,8 +290,8 @@ const ReferenceDataManagement = () => {
     } catch (error) {
       console.error('Upload error:', error);
       toast({
-        title: "Ошибка загрузки",
-        description: error instanceof Error ? error.message : "Не удалось загрузить файл",
+        title: "Upload-Fehler",
+        description: error instanceof Error ? error.message : "Datei konnte nicht hochgeladen werden",
         variant: "destructive",
       });
     } finally {
@@ -317,22 +317,22 @@ const ReferenceDataManagement = () => {
       if (metaDeleteError) throw metaDeleteError;
 
       toast({
-        title: "Данные очищены",
-        description: `Эталонные данные ${listType} удалены`,
+        title: "Daten gelöscht",
+        description: `Referenzdaten ${listType} entfernt`,
       });
 
       await loadReferenceData();
     } catch (error) {
       toast({
-        title: "Ошибка",
-        description: "Не удалось очистить данные",
+        title: "Fehler",
+        description: "Daten konnten nicht gelöscht werden",
         variant: "destructive",
       });
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ru-RU');
+    return new Date(dateString).toLocaleDateString('de-DE');
   };
 
   const getStatsForType = (type: string) => {
@@ -352,15 +352,15 @@ const ReferenceDataManagement = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
-                {type} Reference List
+                {type}
               </CardTitle>
               <CardDescription>
-                Эталонные данные для {type === 'CMRT' ? 'Conflict Minerals' : type === 'EMRT' ? 'Extended Minerals' : 'All Minerals'}
+                Referenzdaten für {type === 'CMRT' ? 'Konfliktminerale' : type === 'EMRT' ? 'Erweiterte Minerale' : 'Alle Minerale'}
               </CardDescription>
             </div>
             {list && (
               <Badge variant={sectionStats ? "default" : "secondary"}>
-                {list.record_count.toLocaleString()} записей
+                {list.record_count.toLocaleString()} Datensätze
               </Badge>
             )}
           </div>
@@ -370,7 +370,7 @@ const ReferenceDataManagement = () => {
           {uploading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span>Загрузка...</span>
+                <span>Hochladen...</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} />
@@ -381,12 +381,12 @@ const ReferenceDataManagement = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                Обновлено: {formatDate(list.upload_date)}
+                Aktualisiert: {formatDate(list.upload_date)}
               </div>
               
               {sectionStats && sectionStats.metal_counts && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Металлы:</p>
+                  <p className="text-sm font-medium">Metalle:</p>
                   <div className="flex flex-wrap gap-1">
                     {sectionStats.metal_counts && typeof sectionStats.metal_counts === 'object' && 
                      Object.entries(sectionStats.metal_counts).map(([metal, count]) => (
@@ -416,7 +416,7 @@ const ReferenceDataManagement = () => {
                   disabled={uploading}
                 >
                   <Upload className="h-4 w-4 mr-2" />
-                  Обновить
+                  Aktualisieren
                 </Button>
                 
                 <Button
@@ -433,7 +433,7 @@ const ReferenceDataManagement = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm">Данные не загружены</span>
+                <span className="text-sm">Daten nicht geladen</span>
               </div>
               
               <Button
@@ -452,7 +452,7 @@ const ReferenceDataManagement = () => {
                 disabled={uploading}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Загрузить {type} файл
+                {type} Datei hochladen
               </Button>
             </div>
           )}
@@ -470,7 +470,7 @@ const ReferenceDataManagement = () => {
             <div className="flex items-center justify-center h-64">
               <div className="text-center space-y-2">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Загрузка данных...</p>
+                <p className="text-muted-foreground">Daten laden...</p>
               </div>
             </div>
           </div>
@@ -484,37 +484,13 @@ const ReferenceDataManagement = () => {
       <Navigation />
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="text-center space-y-2 flex-1">
-              <h1 className="text-4xl font-bold text-foreground">
-                Управление эталонными данными
-              </h1>
-              <p className="text-muted-foreground">
-                Загрузка и управление эталонными списками RMI для CMRT, EMRT и AMRT
-              </p>
-            </div>
-            <Card className="w-72">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium">{user?.email}</p>
-                      <Badge variant="outline" className="text-xs">
-                        {userRole || 'viewer'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={signOut}
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="text-center space-y-2">
+            <h1 className="text-4xl font-bold text-foreground">
+              Referenzdaten-Verwaltung
+            </h1>
+            <p className="text-muted-foreground">
+              Upload und Verwaltung von RMI-Referenzlisten für CMRT, EMRT und AMRT
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -525,9 +501,9 @@ const ReferenceDataManagement = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Общая статистика</CardTitle>
+              <CardTitle>Gesamtstatistik</CardTitle>
               <CardDescription>
-                Сводная информация по всем эталонным спискам
+                Zusammenfassende Informationen zu allen Referenzlisten
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -539,7 +515,7 @@ const ReferenceDataManagement = () => {
                       {stat.total_facilities.toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {stat.last_updated ? `Обновлено: ${formatDate(stat.last_updated)}` : 'Не загружено'}
+                      {stat.last_updated ? `Aktualisiert: ${formatDate(stat.last_updated)}` : 'Nicht geladen'}
                     </p>
                   </div>
                 ))}
