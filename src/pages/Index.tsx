@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Play, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { ComparisonResults, type ComparisonResult } from '@/components/ComparisonResults';
+import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 
 interface FileData {
   id: string;
@@ -16,23 +18,12 @@ interface FileData {
   error?: string;
 }
 
-interface CMRTData {
-  metal: string;
-  smelterName: string;
-  smelterCountry: string;
-  smelterIdentificationNumber: string;
-}
-
-interface RMIData {
-  facilityId: string;
-  standardFacilityName: string;
-  metal: string;
-  assessmentStatus: string;
-}
 
 const Index = () => {
   const [files, setFiles] = useState<FileData[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([]);
+  const [isComparing, setIsComparing] = useState(false);
   const { toast } = useToast();
 
   const detectFileType = (filename: string): 'cmrt' | 'rmi' | 'unknown' => {
@@ -224,8 +215,77 @@ const Index = () => {
     }
   }, [handleFileUpload]);
 
+  const runComparison = async () => {
+    // Validate that we have both CMRT and RMI files
+    const cmrtFiles = files.filter(f => f.type === 'cmrt' && f.status === 'complete' && f.data?.cmrtData);
+    const rmiFiles = files.filter(f => f.type === 'rmi' && f.status === 'complete' && f.data?.rmiData);
+
+    if (cmrtFiles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No CMRT files found",
+        description: "Please upload at least one CMRT file to run comparison.",
+      });
+      return;
+    }
+
+    if (rmiFiles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No RMI files found", 
+        description: "Please upload at least one RMI conformant facility list to run comparison.",
+      });
+      return;
+    }
+
+    setIsComparing(true);
+    setComparisonResults([]);
+
+    try {
+      // Combine all RMI data
+      const allRmiData: RMIData[] = [];
+      rmiFiles.forEach(file => {
+        if (file.data?.rmiData) {
+          allRmiData.push(...file.data.rmiData);
+        }
+      });
+
+      // Create comparison engine
+      const engine = createComparisonEngine(allRmiData);
+      
+      // Process each CMRT file
+      const allResults: ComparisonResult[] = [];
+      
+      for (const cmrtFile of cmrtFiles) {
+        if (cmrtFile.data?.cmrtData) {
+          const supplierName = cmrtFile.name.replace(/\.(xlsx|xls)$/i, '');
+          const results = engine.compareSupplierData(supplierName, cmrtFile.data.cmrtData);
+          allResults.push(...results);
+        }
+      }
+
+      setComparisonResults(allResults);
+
+      toast({
+        title: "Comparison completed",
+        description: `Processed ${allResults.length} smelters across ${cmrtFiles.length} suppliers.`,
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast({
+        variant: "destructive",
+        title: "Comparison failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
   const clearAllFiles = () => {
     setFiles([]);
+    setComparisonResults([]);
     toast({
       title: "Files cleared",
       description: "All uploaded files have been removed.",
@@ -234,6 +294,10 @@ const Index = () => {
 
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId));
+    // Clear comparison results if removing files that were used in comparison
+    if (comparisonResults.length > 0) {
+      setComparisonResults([]);
+    }
   };
 
   const getStatusIcon = (status: FileData['status']) => {
@@ -386,6 +450,59 @@ const Index = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Process Files Section */}
+        {files.some(f => f.status === 'complete') && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Run Comparison</CardTitle>
+              <CardDescription>
+                Compare uploaded CMRT files against RMI conformant facility lists
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  onClick={runComparison}
+                  disabled={isComparing}
+                  className="flex items-center gap-2"
+                >
+                  {isComparing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  {isComparing ? 'Processing...' : 'Process Files'}
+                </Button>
+                
+                {comparisonResults.length > 0 && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => setComparisonResults([])}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Clear Results
+                  </Button>
+                )}
+              </div>
+              
+              <div className="mt-4 text-sm text-muted-foreground">
+                <p>
+                  <strong>CMRT files:</strong> {files.filter(f => f.type === 'cmrt' && f.status === 'complete').length} ready
+                </p>
+                <p>
+                  <strong>RMI files:</strong> {files.filter(f => f.type === 'rmi' && f.status === 'complete').length} ready
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Comparison Results */}
+        <ComparisonResults 
+          results={comparisonResults}
+          isProcessing={isComparing}
+        />
       </div>
     </div>
   );
