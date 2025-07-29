@@ -112,8 +112,11 @@ const ReferenceDataManagement = () => {
 
       const headers = data[0];
       const rows = data.slice(1);
+      
+      console.log('CSV Headers found:', headers);
+      console.log('Total rows to process:', rows.length);
 
-      // Map headers to database columns
+      // Map headers to database columns with more flexible matching
       const headerMapping = {
         'Facility ID': 'smelter_id',
         'Metal': 'metal',
@@ -130,14 +133,43 @@ const ReferenceDataManagement = () => {
         'Re-Assessment In Progress': 'reassessment_in_progress'
       };
 
-      // Find column indices
+      // Find column indices with more flexible matching
       const columnIndices: Record<string, number> = {};
       Object.keys(headerMapping).forEach(headerName => {
-        const index = headers.findIndex(h => h && h.toString().toLowerCase().includes(headerName.toLowerCase()));
+        // Try exact match first
+        let index = headers.findIndex(h => h && h.toString().trim() === headerName);
+        
+        // If no exact match, try partial match
+        if (index === -1) {
+          index = headers.findIndex(h => h && h.toString().toLowerCase().includes(headerName.toLowerCase()));
+        }
+        
+        // Try some alternative header names
+        if (index === -1) {
+          const alternatives: Record<string, string[]> = {
+            'Facility ID': ['smelter id', 'facility_id', 'id'],
+            'Standard Facility Name': ['facility name', 'smelter name', 'name'],
+            'Country Location': ['country', 'location'],
+            'State/ Province/ Region': ['state', 'province', 'region']
+          };
+          
+          if (alternatives[headerName]) {
+            for (const alt of alternatives[headerName]) {
+              index = headers.findIndex(h => h && h.toString().toLowerCase().includes(alt));
+              if (index !== -1) break;
+            }
+          }
+        }
+        
         if (index !== -1) {
           columnIndices[headerMapping[headerName as keyof typeof headerMapping]] = index;
+          console.log(`Mapped header "${headerName}" to column ${index}: "${headers[index]}"`);
+        } else {
+          console.warn(`Header "${headerName}" not found in CSV`);
         }
       });
+      
+      console.log('Column indices mapping:', columnIndices);
 
       setUploadProgress(prev => ({ ...prev, [listType]: 20 }));
 
@@ -193,15 +225,27 @@ const ReferenceDataManagement = () => {
           });
           
           return facility;
-        })
-        .filter(facility => facility.smelter_id || facility.standard_smelter_name);
+        });
+        
+      console.log('Raw facilities before filtering:', facilities.length);
+      console.log('Sample facility object:', facilities[0]);
+      
+      const filteredFacilities = facilities.filter(facility => facility.smelter_id || facility.standard_smelter_name);
+      
+      console.log('Filtered facilities:', filteredFacilities.length);
+      console.log('Sample filtered facility:', filteredFacilities[0]);
+      
+      if (filteredFacilities.length === 0) {
+        console.error('No valid facilities found. Check header mapping and data format.');
+        throw new Error('В файле не найдено валидных записей. Проверьте формат данных и заголовки.');
+      }
 
       setUploadProgress(prev => ({ ...prev, [listType]: 60 }));
 
       // Insert data in batches
       const batchSize = 1000;
-      for (let i = 0; i < facilities.length; i += batchSize) {
-        const batch = facilities.slice(i, i + batchSize);
+      for (let i = 0; i < filteredFacilities.length; i += batchSize) {
+        const batch = filteredFacilities.slice(i, i + batchSize);
         const { error: insertError } = await supabase
           .from('reference_facilities')
           .insert(batch);
@@ -210,7 +254,7 @@ const ReferenceDataManagement = () => {
         
         setUploadProgress(prev => ({ 
           ...prev, 
-          [listType]: 60 + (i / facilities.length) * 30 
+          [listType]: 60 + (i / filteredFacilities.length) * 30 
         }));
       }
 
@@ -228,7 +272,7 @@ const ReferenceDataManagement = () => {
         .insert({
           type: listType,
           version: new Date().toISOString().split('T')[0],
-          record_count: facilities.length,
+          record_count: filteredFacilities.length,
         });
 
       if (insertError) throw insertError;
@@ -237,7 +281,7 @@ const ReferenceDataManagement = () => {
 
       toast({
         title: "Успешно загружено",
-        description: `Загружено ${facilities.length} записей для ${listType}`,
+        description: `Загружено ${filteredFacilities.length} записей для ${listType}`,
       });
 
       // Reload data
