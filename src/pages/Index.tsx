@@ -87,16 +87,25 @@ const Index = () => {
               if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
                 const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
                 const smelterNameIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('smelter') && h.toLowerCase().includes('name')) ||
-                  h.toLowerCase().includes('facility name') ||
-                  h.toLowerCase().includes('refinery name')
+                  (h.toLowerCase().includes('smelter look-up') ||
+                   h.toLowerCase().includes('smelter name') ||
+                   h.toLowerCase().includes('facility name') ||
+                   h.toLowerCase().includes('refinery name'))
                 );
                 const countryIndex = headers.findIndex(h => h && h.toLowerCase().includes('country'));
                 const idIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('identification') || 
+                  (h.toLowerCase().includes('smelter identification') || 
+                   h.toLowerCase().includes('identification') || 
                    h.toLowerCase().includes('facility id') ||
                    h.toLowerCase().includes('smelter id'))
                 );
+                
+                console.log('CMRT индексы колонок:', {
+                  metalIndex,
+                  smelterNameIndex, 
+                  countryIndex,
+                  idIndex
+                });
                 
                 const smelterName = row[smelterNameIndex] || '';
                 const metal = row[metalIndex] || '';
