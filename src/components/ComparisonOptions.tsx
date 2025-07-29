@@ -30,7 +30,6 @@ interface ComparisonOptionsProps {
 }
 
 const AVAILABLE_STANDARDS = ['CMRT', 'EMRT', 'AMRT'];
-const AVAILABLE_METALS = ['Gold', 'Tin', 'Tantalum', 'Tungsten'];
 
 const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange, settings }) => {
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
@@ -38,10 +37,31 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
     totalRecords: 0,
     details: []
   });
+  const [availableMetals, setAvailableMetals] = useState<string[]>([]);
 
   useEffect(() => {
     loadDatabaseStatus();
+    loadAvailableMetals();
   }, []);
+
+  const loadAvailableMetals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reference_facilities')
+        .select('metal')
+        .not('metal', 'is', null);
+
+      if (error) throw error;
+
+      const uniqueMetals = [...new Set(data?.map(item => item.metal) || [])]
+        .filter(Boolean)
+        .sort();
+
+      setAvailableMetals(uniqueMetals);
+    } catch (error) {
+      console.error('Error loading available metals:', error);
+    }
+  };
 
   const loadDatabaseStatus = async () => {
     try {
@@ -112,7 +132,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
   const selectAllMetals = () => {
     onSettingsChange({
       ...settings,
-      metals: [...AVAILABLE_METALS]
+      metals: [...availableMetals]
     });
   };
 
@@ -233,7 +253,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
                   variant="outline" 
                   size="sm" 
                   onClick={selectAllMetals}
-                  disabled={settings.metals.length === AVAILABLE_METALS.length}
+                  disabled={settings.metals.length === availableMetals.length}
                 >
                   Выбрать все
                 </Button>
@@ -249,7 +269,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {AVAILABLE_METALS.map(metal => (
+              {availableMetals.map(metal => (
                 <div key={metal} className="flex items-center space-x-2">
                   <Checkbox
                     id={`metal-${metal}`}
