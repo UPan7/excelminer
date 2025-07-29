@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Play, RotateCcw } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Play, RotateCcw, Shield } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ComparisonResults, type ComparisonResult } from '@/components/ComparisonResults';
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
+import { Link } from 'react-router-dom';
 
 interface FileData {
   id: string;
@@ -478,11 +479,21 @@ const Index = () => {
       <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">CMRT/EMRT Compliance Checker</h1>
-          <p className="text-xl text-muted-foreground">
-            Upload and process mineral supply chain reports to validate compliance
-          </p>
+        <div className="flex items-center justify-between">
+          <div className="text-center space-y-2 flex-1">
+            <h1 className="text-4xl font-bold text-foreground">CMRT/EMRT Compliance Checker</h1>
+            <p className="text-xl text-muted-foreground">
+              Upload and process mineral supply chain reports to validate compliance
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link to="/auth" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Admin Login
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Upload Zone */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Database, Calendar, FileText, Trash2, Eye, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Upload, Database, Calendar, FileText, Trash2, Eye, CheckCircle, AlertTriangle, Shield, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Navigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 
 interface ReferenceList {
@@ -28,12 +30,30 @@ interface ReferenceStats {
 }
 
 const ReferenceDataManagement = () => {
+  const { user, loading: authLoading, signOut, userRole } = useAuth();
   const [referenceLists, setReferenceLists] = useState<ReferenceList[]>([]);
   const [stats, setStats] = useState<ReferenceStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+
+  // Redirect to auth if not authenticated
+  if (!authLoading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Проверка авторизации...</p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     loadReferenceData();
@@ -411,13 +431,37 @@ const ReferenceDataManagement = () => {
       <Navigation />
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold text-foreground">
-              Управление эталонными данными
-            </h1>
-            <p className="text-muted-foreground">
-              Загрузка и управление эталонными списками RMI для CMRT, EMRT и AMRT
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="text-center space-y-2 flex-1">
+              <h1 className="text-4xl font-bold text-foreground">
+                Управление эталонными данными
+              </h1>
+              <p className="text-muted-foreground">
+                Загрузка и управление эталонными списками RMI для CMRT, EMRT и AMRT
+              </p>
+            </div>
+            <Card className="w-72">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">{user?.email}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {userRole || 'viewer'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={signOut}
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
