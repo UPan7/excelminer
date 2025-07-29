@@ -1,38 +1,106 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Play, RotateCcw, Shield } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertTriangle, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ComparisonResults, type ComparisonResult } from '@/components/ComparisonResults';
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
-import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
-interface FileData {
+interface SupplierFileData {
   id: string;
   name: string;
-  type: 'cmrt' | 'rmi' | 'unknown';
   status: 'pending' | 'processing' | 'complete' | 'error';
   size: number;
-  data?: any;
+  data?: CMRTData[];
   error?: string;
 }
 
+interface ComparisonSettings {
+  standards: string[];
+  metals: string[];
+}
+
+interface DatabaseStatus {
+  isReady: boolean;
+  totalRecords: number;
+  lastUpdated?: string;
+  details: Array<{
+    type: string;
+    count: number;
+    lastUpdated?: string;
+    metalCounts?: { [metal: string]: number };
+  }>;
+}
+
+const AVAILABLE_STANDARDS = ['CMRT', 'EMRT', 'AMRT'];
 
 const Index = () => {
-  const [files, setFiles] = useState<FileData[]>([]);
+  const [supplierFiles, setSupplierFiles] = useState<SupplierFileData[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([]);
   const [isComparing, setIsComparing] = useState(false);
+  const [settings, setSettings] = useState<ComparisonSettings>({
+    standards: ['CMRT'],
+    metals: []
+  });
+  const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
+    isReady: false,
+    totalRecords: 0,
+    details: []
+  });
+  const [availableMetals, setAvailableMetals] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const detectFileType = (filename: string): 'cmrt' | 'rmi' | 'unknown' => {
-    const lower = filename.toLowerCase();
-    if (lower.includes('cmrt') || lower.includes('emrt')) return 'cmrt';
-    if (lower.includes('rmi') || lower.includes('conformant') || lower.endsWith('.csv')) return 'rmi';
-    return 'unknown';
+  useEffect(() => {
+    loadDatabaseStatus();
+  }, []);
+
+  const loadDatabaseStatus = async () => {
+    try {
+      const { data: statsData, error: statsError } = await supabase
+        .rpc('get_reference_stats');
+
+      if (statsError) throw statsError;
+
+      // Get unique metals from database
+      const { data: metalData, error: metalError } = await supabase
+        .from('reference_facilities')
+        .select('metal')
+        .not('metal', 'is', null);
+
+      if (metalError) throw metalError;
+
+      const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(Boolean))].sort();
+      setAvailableMetals(uniqueMetals);
+
+      const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
+      const isReady = totalRecords > 0;
+
+      const details = AVAILABLE_STANDARDS.map(type => {
+        const stat = (statsData || []).find((s: any) => s.list_type === type);
+        return {
+          type,
+          count: stat?.total_facilities || 0,
+          lastUpdated: stat?.last_updated,
+          metalCounts: (stat?.metal_counts || {}) as { [metal: string]: number }
+        };
+      });
+
+      setDbStatus({
+        isReady,
+        totalRecords,
+        details
+      });
+    } catch (error) {
+      console.error('Error loading database status:', error);
+    }
   };
 
   const parseCSVFile = (text: string): string[][] => {
@@ -41,7 +109,6 @@ const Index = () => {
     
     for (const line of lines) {
       if (line.trim()) {
-        // Простой парсер CSV с поддержкой кавычек
         const fields: string[] = [];
         let current = '';
         let inQuotes = false;
@@ -67,10 +134,9 @@ const Index = () => {
     return result;
   };
 
-  const parseFile = async (file: File): Promise<{ cmrtData?: CMRTData[], rmiData?: RMIData[] }> => {
+  const parseSupplierFile = async (file: File): Promise<CMRTData[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      const fileType = detectFileType(file.name);
       const isCSV = file.name.toLowerCase().endsWith('.csv');
       
       reader.onload = (e) => {
@@ -78,187 +144,71 @@ const Index = () => {
           let jsonData: any[][];
           
           if (isCSV) {
-            // Парсинг CSV файла
             const text = e.target?.result as string;
             jsonData = parseCSVFile(text);
-            console.log('CSV первые 10 строк:', jsonData.slice(0, 10));
           } else {
-            // Парсинг Excel файла
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
-            
-            let worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            
-            if (fileType === 'cmrt') {
-              // Parse CMRT file - look for "Smelter List" sheet
-              worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
-            } else if (fileType === 'rmi') {
-              // Проверяем все листы на наличие данных о плавильнях
-              for (const sheetName of workbook.SheetNames) {
-                const sheet = workbook.Sheets[sheetName];
-                const testData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                const hasRmiData = testData.some((row: any) => 
-                  row.some((cell: any) => 
-                    typeof cell === 'string' && 
-                    (cell.toLowerCase().includes('facility') || 
-                     cell.toLowerCase().includes('conformance') ||
-                     cell.toLowerCase().includes('assessment'))
-                  )
-                );
-                if (hasRmiData) {
-                  worksheet = sheet;
-                  break;
-                }
-              }
-            }
-            
+            let worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
             jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            console.log('Excel первые 10 строк:', jsonData.slice(0, 10));
           }
           
-          if (fileType === 'cmrt') {
-            
-            // В CMRT файлах заголовки обычно в строке 4 (индекс 3)
-            let headerRowIndex = 3;
-            
-            // Если заголовки не в строке 4, ищем их
-            if (headerRowIndex >= jsonData.length || 
-                !jsonData[headerRowIndex] || 
-                !(jsonData[headerRowIndex] as any[]).some((cell: any) => 
-                  typeof cell === 'string' && cell.toLowerCase().includes('metal')
-                )) {
-              headerRowIndex = jsonData.findIndex((row: any) => 
-                row.some((cell: any) => 
-                  typeof cell === 'string' && 
-                  (cell.toLowerCase().includes('metal') || 
-                   cell.toLowerCase().includes('smelter'))
-                )
-              );
-            }
-            
-            if (headerRowIndex === -1) {
-              throw new Error('Could not find header row in CMRT file');
-            }
-            
-            const headers = jsonData[headerRowIndex] as string[];
-            console.log('CMRT заголовки:', headers);
-            
-            const cmrtData: CMRTData[] = [];
-            
-            // Данные начинаются с строки после заголовков
-            for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-              const row = jsonData[i] as any[];
-              if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
-                const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
-                const smelterNameIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('smelter look-up') ||
-                   h.toLowerCase().includes('smelter name') ||
-                   h.toLowerCase().includes('facility name') ||
-                   h.toLowerCase().includes('refinery name'))
-                );
-                const countryIndex = headers.findIndex(h => h && h.toLowerCase().includes('country'));
-                const idIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('smelter identification') || 
-                   h.toLowerCase().includes('identification') || 
-                   h.toLowerCase().includes('facility id') ||
-                   h.toLowerCase().includes('smelter id'))
-                );
-                
-                console.log('CMRT индексы колонок:', {
-                  metalIndex,
-                  smelterNameIndex, 
-                  countryIndex,
-                  idIndex
-                });
-                
-                const smelterName = row[smelterNameIndex] || '';
-                const metal = row[metalIndex] || '';
-                
-                // Добавляем только строки с названием плавильни
-                if (smelterName && smelterName.toString().trim()) {
-                  cmrtData.push({
-                    metal: metal.toString().trim(),
-                    smelterName: smelterName.toString().trim(),
-                    smelterCountry: (row[countryIndex] || '').toString().trim(),
-                    smelterIdentificationNumber: (row[idIndex] || '').toString().trim(),
-                  });
-                }
-              }
-            }
-            
-            console.log('CMRT извлечено записей:', cmrtData.length);
-            console.log('CMRT первые 3 записи:', cmrtData.slice(0, 3));
-            
-            resolve({ cmrtData });
-          } else if (fileType === 'rmi') {
-            
-            const headerRowIndex = jsonData.findIndex((row: any) => 
+          let headerRowIndex = 3;
+          
+          if (headerRowIndex >= jsonData.length || 
+              !jsonData[headerRowIndex] || 
+              !(jsonData[headerRowIndex] as any[]).some((cell: any) => 
+                typeof cell === 'string' && cell.toLowerCase().includes('metal')
+              )) {
+            headerRowIndex = jsonData.findIndex((row: any) => 
               row.some((cell: any) => 
                 typeof cell === 'string' && 
-                (cell.toLowerCase().includes('facility') || 
-                 cell.toLowerCase().includes('standard') ||
-                 cell.toLowerCase().includes('conformance'))
+                (cell.toLowerCase().includes('metal') || 
+                 cell.toLowerCase().includes('smelter'))
               )
             );
-            
-            if (headerRowIndex === -1) {
-              throw new Error('Could not find header row in RMI file');
-            }
-            
-            const headers = jsonData[headerRowIndex] as string[];
-            console.log('RMI заголовки:', headers);
-            
-            const rmiData: RMIData[] = [];
-            
-            for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-              const row = jsonData[i] as any[];
-              if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
-                const facilityIdIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('facility') && h.toLowerCase().includes('id')) ||
-                  h.toLowerCase().includes('identification')
-                );
-                const nameIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('standard') && h.toLowerCase().includes('facility')) ||
-                  h.toLowerCase().includes('facility name') ||
-                  h.toLowerCase().includes('name')
-                );
-                const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
-                const statusIndex = headers.findIndex(h => h && 
-                  (h.toLowerCase().includes('assessment') && h.toLowerCase().includes('status')) ||
-                  h.toLowerCase().includes('conformance') ||
-                  h.toLowerCase().includes('status') ||
-                  h.toLowerCase().includes('source') // Добавляем проверку для "Source of Smelter Identification Number"
-                );
-                
-                console.log('RMI индексы колонок:', {
-                  facilityIdIndex,
-                  nameIndex,
-                  metalIndex,
-                  statusIndex
+          }
+          
+          if (headerRowIndex === -1) {
+            throw new Error('Could not find header row in supplier file');
+          }
+          
+          const headers = jsonData[headerRowIndex] as string[];
+          const supplierData: CMRTData[] = [];
+          
+          for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+            const row = jsonData[i] as any[];
+            if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+              const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
+              const smelterNameIndex = headers.findIndex(h => h && 
+                (h.toLowerCase().includes('smelter look-up') ||
+                 h.toLowerCase().includes('smelter name') ||
+                 h.toLowerCase().includes('facility name') ||
+                 h.toLowerCase().includes('refinery name'))
+              );
+              const countryIndex = headers.findIndex(h => h && h.toLowerCase().includes('country'));
+              const idIndex = headers.findIndex(h => h && 
+                (h.toLowerCase().includes('smelter identification') || 
+                 h.toLowerCase().includes('identification') || 
+                 h.toLowerCase().includes('facility id') ||
+                 h.toLowerCase().includes('smelter id'))
+              );
+              
+              const smelterName = row[smelterNameIndex] || '';
+              const metal = row[metalIndex] || '';
+              
+              if (smelterName && smelterName.toString().trim()) {
+                supplierData.push({
+                  metal: metal.toString().trim(),
+                  smelterName: smelterName.toString().trim(),
+                  smelterCountry: (row[countryIndex] || '').toString().trim(),
+                  smelterIdentificationNumber: (row[idIndex] || '').toString().trim(),
                 });
-                
-                const facilityName = row[nameIndex] || '';
-                const status = row[statusIndex] || '';
-                
-                // Добавляем только строки с названием плавильни
-                if (facilityName && facilityName.toString().trim()) {
-                  rmiData.push({
-                    facilityId: (row[facilityIdIndex] || '').toString().trim(),
-                    standardFacilityName: facilityName.toString().trim(),
-                    metal: (row[metalIndex] || '').toString().trim(),
-                    assessmentStatus: status.toString().trim(),
-                  });
-                }
               }
             }
-            
-            console.log('RMI извлечено записей:', rmiData.length);
-            console.log('RMI первые 3 записи:', rmiData.slice(0, 3));
-            
-            resolve({ rmiData });
-          } else {
-            throw new Error('Unknown file type. Please upload CMRT or RMI files.');
           }
+          
+          resolve(supplierData);
         } catch (error) {
           reject(error);
         }
@@ -273,28 +223,28 @@ const Index = () => {
     });
   };
 
-  const processFile = async (fileData: FileData, file: File) => {
-    setFiles(prev => prev.map(f => 
+  const processSupplierFile = async (fileData: SupplierFileData, file: File) => {
+    setSupplierFiles(prev => prev.map(f => 
       f.id === fileData.id ? { ...f, status: 'processing' } : f
     ));
 
     try {
-      const parsedData = await parseFile(file);
+      const supplierData = await parseSupplierFile(file);
       
-      setFiles(prev => prev.map(f => 
+      setSupplierFiles(prev => prev.map(f => 
         f.id === fileData.id 
-          ? { ...f, status: 'complete', data: parsedData }
+          ? { ...f, status: 'complete', data: supplierData }
           : f
       ));
 
       toast({
-        title: "Datei erfolgreich verarbeitet",
-        description: `${file.name} wurde geparst und Daten extrahiert.`,
+        title: "Lieferantendatei erfolgreich verarbeitet",
+        description: `${file.name} wurde geparst: ${supplierData.length} Schmelzen gefunden.`,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
       
-      setFiles(prev => prev.map(f => 
+      setSupplierFiles(prev => prev.map(f => 
         f.id === fileData.id 
           ? { ...f, status: 'error', error: errorMessage }
           : f
@@ -309,19 +259,17 @@ const Index = () => {
   };
 
   const handleFileUpload = useCallback((uploadedFiles: FileList) => {
-    const newFiles: FileData[] = Array.from(uploadedFiles).map(file => ({
+    const newFiles: SupplierFileData[] = Array.from(uploadedFiles).map(file => ({
       id: `${Date.now()}-${Math.random()}`,
       name: file.name,
-      type: detectFileType(file.name),
       status: 'pending',
       size: file.size,
     }));
 
-    setFiles(prev => [...prev, ...newFiles]);
+    setSupplierFiles(prev => [...prev, ...newFiles]);
 
-    // Process files automatically
     Array.from(uploadedFiles).forEach((file, index) => {
-      processFile(newFiles[index], file);
+      processSupplierFile(newFiles[index], file);
     });
   }, []);
 
@@ -352,24 +300,30 @@ const Index = () => {
   }, [handleFileUpload]);
 
   const runComparison = async () => {
-    // Validate that we have both CMRT and RMI files
-    const cmrtFiles = files.filter(f => f.type === 'cmrt' && f.status === 'complete' && f.data?.cmrtData);
-    const rmiFiles = files.filter(f => f.type === 'rmi' && f.status === 'complete' && f.data?.rmiData);
-
-    if (cmrtFiles.length === 0) {
+    if (settings.standards.length === 0) {
       toast({
         variant: "destructive",
-        title: "No CMRT files found",
-        description: "Please upload at least one CMRT file to run comparison.",
+        title: "Keine Standards ausgewählt",
+        description: "Bitte wählen Sie mindestens einen Standard für den Vergleich aus.",
       });
       return;
     }
 
-    if (rmiFiles.length === 0) {
+    if (settings.metals.length === 0) {
       toast({
         variant: "destructive",
-        title: "No RMI files found", 
-        description: "Please upload at least one RMI conformant facility list to run comparison.",
+        title: "Keine Metalle ausgewählt",
+        description: "Bitte wählen Sie mindestens ein Metall für die Prüfung aus.",
+      });
+      return;
+    }
+
+    const completeFiles = supplierFiles.filter(f => f.status === 'complete' && f.data);
+    if (completeFiles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Keine Lieferantendateien",
+        description: "Bitte laden Sie mindestens eine Lieferantendatei hoch.",
       });
       return;
     }
@@ -378,24 +332,33 @@ const Index = () => {
     setComparisonResults([]);
 
     try {
-      // Combine all RMI data
-      const allRmiData: RMIData[] = [];
-      rmiFiles.forEach(file => {
-        if (file.data?.rmiData) {
-          allRmiData.push(...file.data.rmiData);
-        }
-      });
+      const { data: referenceData, error } = await supabase
+        .from('reference_facilities')
+        .select('*')
+        .in('list_type', settings.standards)
+        .in('metal', settings.metals)
+        .not('standard_smelter_name', 'is', null);
 
-      // Create comparison engine
-      const engine = createComparisonEngine(allRmiData);
-      
-      // Process each CMRT file
+      if (error) throw error;
+
+      const rmiData: RMIData[] = (referenceData || []).map(facility => ({
+        facilityId: facility.smelter_id || '',
+        standardFacilityName: facility.standard_smelter_name || '',
+        metal: facility.metal || '',
+        assessmentStatus: facility.assessment_status || '',
+      }));
+
+      const engine = createComparisonEngine(rmiData);
       const allResults: ComparisonResult[] = [];
       
-      for (const cmrtFile of cmrtFiles) {
-        if (cmrtFile.data?.cmrtData) {
-          const supplierName = cmrtFile.name.replace(/\.(xlsx|xls)$/i, '');
-          const results = engine.compareSupplierData(supplierName, cmrtFile.data.cmrtData);
+      for (const supplierFile of completeFiles) {
+        if (supplierFile.data) {
+          const filteredData = supplierFile.data.filter(item => 
+            settings.metals.includes(item.metal)
+          );
+
+          const supplierName = supplierFile.name.replace(/\.(xlsx|xls|csv)$/i, '');
+          const results = engine.compareSupplierData(supplierName, filteredData);
           allResults.push(...results);
         }
       }
@@ -403,15 +366,15 @@ const Index = () => {
       setComparisonResults(allResults);
 
       toast({
-        title: "Comparison completed",
-        description: `Processed ${allResults.length} smelters across ${cmrtFiles.length} suppliers.`,
+        title: "Vergleich abgeschlossen",
+        description: `${allResults.length} Schmelzen geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
       });
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
       toast({
         variant: "destructive",
-        title: "Comparison failed",
+        title: "Vergleich fehlgeschlagen",
         description: errorMessage,
       });
     } finally {
@@ -420,23 +383,62 @@ const Index = () => {
   };
 
   const clearAllFiles = () => {
-    setFiles([]);
+    setSupplierFiles([]);
     setComparisonResults([]);
     toast({
-      title: "Files cleared",
-      description: "All uploaded files have been removed.",
+      title: "Dateien gelöscht",
+      description: "Alle hochgeladenen Dateien wurden entfernt.",
     });
   };
 
   const removeFile = (fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
-    // Clear comparison results if removing files that were used in comparison
+    setSupplierFiles(prev => prev.filter(f => f.id !== fileId));
     if (comparisonResults.length > 0) {
       setComparisonResults([]);
     }
   };
 
-  const getStatusIcon = (status: FileData['status']) => {
+  const handleStandardChange = (standard: string, checked: boolean) => {
+    const newStandards = checked 
+      ? [...settings.standards, standard]
+      : settings.standards.filter(s => s !== standard);
+    
+    setSettings({
+      ...settings,
+      standards: newStandards
+    });
+  };
+
+  const handleMetalChange = (metal: string, checked: boolean) => {
+    const newMetals = checked
+      ? [...settings.metals, metal]
+      : settings.metals.filter(m => m !== metal);
+    
+    setSettings({
+      ...settings,
+      metals: newMetals
+    });
+  };
+
+  const selectAllMetals = () => {
+    setSettings({
+      ...settings,
+      metals: [...availableMetals]
+    });
+  };
+
+  const deselectAllMetals = () => {
+    setSettings({
+      ...settings,
+      metals: []
+    });
+  };
+
+  const formatDate = (dateString?: string) => {
+    return dateString ? new Date(dateString).toLocaleDateString('de-DE') : 'Nicht geladen';
+  };
+
+  const getStatusIcon = (status: SupplierFileData['status']) => {
     switch (status) {
       case 'pending':
         return <FileText className="h-4 w-4 text-muted-foreground" />;
@@ -449,209 +451,373 @@ const Index = () => {
     }
   };
 
-  const getStatusBadge = (status: FileData['status']) => {
+  const getStatusBadge = (status: SupplierFileData['status']) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge variant="secondary">Wartend</Badge>;
       case 'processing':
-        return <Badge className="bg-primary">Processing</Badge>;
+        return <Badge className="bg-primary">Verarbeitung</Badge>;
       case 'complete':
-        return <Badge className="bg-green-600 hover:bg-green-700">Complete</Badge>;
+        return <Badge className="bg-green-600 hover:bg-green-700">Abgeschlossen</Badge>;
       case 'error':
-        return <Badge variant="destructive">Error</Badge>;
-    }
-  };
-
-  const getFileTypeBadge = (type: FileData['type']) => {
-    switch (type) {
-      case 'cmrt':
-        return <Badge variant="outline" className="text-blue-600 border-blue-600">CMRT</Badge>;
-      case 'rmi':
-        return <Badge variant="outline" className="text-purple-600 border-purple-600">RMI</Badge>;
-      case 'unknown':
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="destructive">Fehler</Badge>;
     }
   };
 
   return (
     <>
       <Navigation />
-      <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="text-center space-y-2 flex-1">
-            <h1 className="text-4xl font-bold text-foreground">CMRT/EMRT Compliance Checker</h1>
-            <p className="text-xl text-muted-foreground">
-              Upload und Verarbeitung von Mineralien-Lieferketten-Berichten zur Validierung der Compliance
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold mb-4">ExcelMiner</h1>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Professionelles Tool zum Vergleich von Lieferanten-Schmelzen mit Referenzdaten.
+              Wählen Sie Standards und Metalle aus und laden Sie Ihre Lieferantendateien hoch.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link to="/auth" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Admin-Anmeldung
-              </Link>
-            </Button>
-          </div>
-        </div>
 
-        {/* Upload Zone */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Dateien hochladen</CardTitle>
-            <CardDescription>
-              Ziehen Sie Ihre CMRT/EMRT-Berichte und RMI-konforme Anlagenlisten hier hinein
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50'
-              }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <div className="space-y-2">
-                <p className="text-lg font-medium">
-                  Ziehen Sie Ihre Excel- oder CSV-Dateien hierher
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Unterstützt .xlsx, .xls und .csv Dateien • CMRT, EMRT und RMI-Anlagenlisten
-                </p>
-                <div className="pt-4">
-                  <Button asChild>
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      Dateien auswählen
-                    </label>
-                  </Button>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* Database Status */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      {dbStatus.isReady ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <AlertTriangle className="h-5 w-5 text-amber-500" />
+                      )}
+                      Referenzdatenbank Status
+                    </CardTitle>
+                    <CardDescription>
+                      {dbStatus.isReady 
+                        ? `Datenbank bereit • ${dbStatus.totalRecords.toLocaleString()} Einträge`
+                        : 'Referenzdaten müssen geladen werden'
+                      }
+                    </CardDescription>
+                  </div>
+                  <Badge variant={dbStatus.isReady ? "default" : "secondary"}>
+                    {dbStatus.isReady ? "✓ Bereit" : "⚠️ Update erforderlich"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {dbStatus.details.map(detail => (
+                    <div key={detail.type} className="text-center space-y-1">
+                      <p className="font-medium">{detail.type}</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {detail.count.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(detail.lastUpdated)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Metal counts summary */}
+                {availableMetals.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm font-medium mb-2">Verfügbare Metalle:</p>
+                    <p className="text-sm text-muted-foreground">
+                      {availableMetals.join(' | ')}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Comparison Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Vergleichsparameter
+                </CardTitle>
+                <CardDescription>
+                  Wählen Sie Standards und Metalle für die Prüfung aus
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-6">
+                {/* Standards Selection */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Standards für Vergleich</Label>
+                  <div className="grid grid-cols-3 gap-4">
+                    {AVAILABLE_STANDARDS.map(standard => (
+                      <div key={standard} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`standard-${standard}`}
+                          checked={settings.standards.includes(standard)}
+                          onCheckedChange={(checked) => handleStandardChange(standard, checked === true)}
+                          disabled={!dbStatus.details.find(d => d.type === standard)?.count}
+                        />
+                        <Label 
+                          htmlFor={`standard-${standard}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {standard}
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({dbStatus.details.find(d => d.type === standard)?.count || 0})
+                          </span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {settings.standards.length === 0 && (
+                    <p className="text-sm text-amber-600">
+                      ⚠️ Wählen Sie mindestens einen Standard aus
+                    </p>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Metals Selection */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-medium">Metalle für Prüfung</Label>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={selectAllMetals}
+                        disabled={settings.metals.length === availableMetals.length}
+                      >
+                        Alle auswählen
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={deselectAllMetals}
+                        disabled={settings.metals.length === 0}
+                      >
+                        Alle abwählen
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {availableMetals.map(metal => (
+                      <div key={metal} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`metal-${metal}`}
+                          checked={settings.metals.includes(metal)}
+                          onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
+                        />
+                        <Label 
+                          htmlFor={`metal-${metal}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {metal}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {settings.metals.length === 0 && (
+                    <p className="text-sm text-amber-600">
+                      ⚠️ Wählen Sie mindestens ein Metall aus
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* File Upload and Control */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* File Upload */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Lieferantendateien hochladen
+                </CardTitle>
+                <CardDescription>
+                  Laden Sie Ihre CMRT/EMRT/AMRT Lieferantendateien hoch (Excel/CSV)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragOver
+                      ? 'border-primary bg-primary/10'
+                      : 'border-muted-foreground/25 hover:border-primary'
+                  }`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    Dateien hierher ziehen oder klicken zum Auswählen
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    Unterstützte Formate: Excel (.xlsx, .xls), CSV (.csv)
+                  </p>
                   <input
-                    id="file-upload"
                     type="file"
                     multiple
                     accept=".xlsx,.xls,.csv"
                     onChange={handleFileInput}
                     className="hidden"
+                    id="file-upload"
                   />
+                  <Button asChild>
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      Dateien auswählen
+                    </label>
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* File List */}
-        {files.length > 0 && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Hochgeladene Dateien</CardTitle>
+            {/* Process Control */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Vergleich starten</CardTitle>
                 <CardDescription>
-                  {files.length} Datei{files.length !== 1 ? 'en' : ''} hochgeladen
+                  Überprüfen Sie die Einstellungen und starten Sie den Vergleich
                 </CardDescription>
-              </div>
-              <Button variant="outline" onClick={clearAllFiles}>
-                Alle löschen
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {files.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Summary */}
+                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium">Standards: </span>
+                    {settings.standards.length > 0 ? (
+                      <span>{settings.standards.join(', ')}</span>
+                    ) : (
+                      <span className="text-muted-foreground italic">keine ausgewählt</span>
+                    )}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Metalle: </span>
+                    {settings.metals.length > 0 ? (
+                      <span>{settings.metals.join(', ')}</span>
+                    ) : (
+                      <span className="text-muted-foreground italic">keine ausgewählt</span>
+                    )}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Dateien: </span>
+                    {supplierFiles.filter(f => f.status === 'complete').length} bereit
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col gap-3">
+                  <Button 
+                    onClick={runComparison} 
+                    disabled={
+                      settings.standards.length === 0 || 
+                      settings.metals.length === 0 || 
+                      supplierFiles.filter(f => f.status === 'complete').length === 0 || 
+                      isComparing
+                    }
+                    className="w-full"
                   >
-                    <div className="flex items-center space-x-4 flex-1">
-                      {getStatusIcon(file.status)}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{file.name}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          {getFileTypeBadge(file.type)}
-                          {getStatusBadge(file.status)}
-                          <span className="text-sm text-muted-foreground">
-                            {(file.size / 1024).toFixed(1)} KB
-                          </span>
-                        </div>
-                        {file.error && (
-                          <p className="text-sm text-destructive mt-1">{file.error}</p>
-                        )}
-                        {file.status === 'complete' && file.data && (
-                          <p className="text-sm text-green-600 mt-1">
-                            {file.data.cmrtData?.length || file.data.rmiData?.length || 0} Datensätze extrahiert
+                    {isComparing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Vergleiche...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Dateien vergleichen
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={clearAllFiles}
+                    disabled={supplierFiles.length === 0}
+                  >
+                    Alle Dateien löschen
+                  </Button>
+                </div>
+                
+                {/* Validation messages */}
+                {(settings.standards.length === 0 || settings.metals.length === 0) && (
+                  <div className="text-sm text-amber-600 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Bitte wählen Sie mindestens einen Standard und ein Metall aus
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Uploaded Files List */}
+          {supplierFiles.length > 0 && (
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Hochgeladene Lieferantendateien</CardTitle>
+                <CardDescription>
+                  Verwalten Sie Ihre hochgeladenen Dateien
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {supplierFiles.map((file) => (
+                    <div 
+                      key={file.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(file.status)}
+                        <div>
+                          <p className="font-medium">{file.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                            {file.data && ` • ${file.data.length} Schmelzen gefunden`}
                           </p>
-                        )}
+                          {file.error && (
+                            <p className="text-sm text-destructive mt-1">{file.error}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(file.status)}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => removeFile(file.id)}
+                        >
+                          Entfernen
+                        </Button>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(file.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Process Files Section */}
-        {files.some(f => f.status === 'complete') && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Vergleich durchführen</CardTitle>
-              <CardDescription>
-                Vergleichen Sie hochgeladene CMRT-Dateien mit RMI-konformen Anlagenlisten
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  onClick={runComparison}
-                  disabled={isComparing}
-                  className="flex items-center gap-2"
-                >
-                  {isComparing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                  {isComparing ? 'Verarbeitung...' : 'Dateien verarbeiten'}
-                </Button>
-                
-                {comparisonResults.length > 0 && (
-                  <Button 
-                    variant="outline"
-                    onClick={() => setComparisonResults([])}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Ergebnisse löschen
-                  </Button>
-                )}
-              </div>
-              
-              <div className="mt-4 text-sm text-muted-foreground">
-                <p>
-                  <strong>CMRT-Dateien:</strong> {files.filter(f => f.type === 'cmrt' && f.status === 'complete').length} bereit
-                </p>
-                <p>
-                  <strong>RMI-Dateien:</strong> {files.filter(f => f.type === 'rmi' && f.status === 'complete').length} bereit
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Comparison Results */}
-        <ComparisonResults 
-          results={comparisonResults}
-          isProcessing={isComparing}
-        />
-      </div>
+          {/* Results */}
+          {comparisonResults.length > 0 && (
+            <div className="mb-8">
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle>Vergleichsergebnis</CardTitle>
+                  <CardDescription>
+                    Geprüft: {comparisonResults.length} Schmelzen | 
+                    Standards: {settings.standards.join(', ')} | 
+                    Metalle: {settings.metals.join(', ')}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              <ComparisonResults results={comparisonResults} isProcessing={isComparing} />
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
