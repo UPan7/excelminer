@@ -27,41 +27,21 @@ interface DatabaseStatus {
 interface ComparisonOptionsProps {
   onSettingsChange: (settings: ComparisonSettings) => void;
   settings: ComparisonSettings;
+  availableMetals: string[];
 }
 
 const AVAILABLE_STANDARDS = ['CMRT', 'EMRT', 'AMRT'];
 
-const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange, settings }) => {
+const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange, settings, availableMetals }) => {
   const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
     isReady: false,
     totalRecords: 0,
     details: []
   });
-  const [availableMetals, setAvailableMetals] = useState<string[]>([]);
 
   useEffect(() => {
     loadDatabaseStatus();
-    loadAvailableMetals();
   }, []);
-
-  const loadAvailableMetals = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('reference_facilities')
-        .select('metal')
-        .not('metal', 'is', null);
-
-      if (error) throw error;
-
-      const uniqueMetals = [...new Set(data?.map(item => item.metal) || [])]
-        .filter(Boolean)
-        .sort();
-
-      setAvailableMetals(uniqueMetals);
-    } catch (error) {
-      console.error('Error loading available metals:', error);
-    }
-  };
 
   const loadDatabaseStatus = async () => {
     try {
@@ -247,7 +227,9 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
           {/* Metals Selection */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Металлы для проверки</Label>
+              <Label className="text-base font-medium">
+                Металлы для проверки ({availableMetals.length} доступно)
+              </Label>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
