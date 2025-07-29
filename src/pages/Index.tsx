@@ -44,59 +44,110 @@ const Index = () => {
           const fileType = detectFileType(file.name);
           
           if (fileType === 'cmrt') {
-            // Look for "Smelter List" sheet or similar
-            const smelterSheetName = workbook.SheetNames.find(name => 
-              name.toLowerCase().includes('smelter') || 
-              name.toLowerCase().includes('list')
-            ) || workbook.SheetNames[0];
+            // Parse CMRT file - look for "Smelter List" sheet
+            let worksheet = workbook.Sheets['Smelter List'];
+            if (!worksheet) {
+              // If "Smelter List" sheet not found, try first sheet
+              worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            }
             
-            const worksheet = workbook.Sheets[smelterSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            console.log('CMRT первые 10 строк:', jsonData.slice(0, 10));
             
-            // Find header row and extract data
-            const headerRowIndex = jsonData.findIndex((row: any) => 
-              row.some((cell: any) => 
-                typeof cell === 'string' && 
-                (cell.toLowerCase().includes('metal') || 
-                 cell.toLowerCase().includes('smelter'))
-              )
-            );
+            // В CMRT файлах заголовки обычно в строке 4 (индекс 3)
+            let headerRowIndex = 3;
+            
+            // Если заголовки не в строке 4, ищем их
+            if (headerRowIndex >= jsonData.length || 
+                !jsonData[headerRowIndex] || 
+                !(jsonData[headerRowIndex] as any[]).some((cell: any) => 
+                  typeof cell === 'string' && cell.toLowerCase().includes('metal')
+                )) {
+              headerRowIndex = jsonData.findIndex((row: any) => 
+                row.some((cell: any) => 
+                  typeof cell === 'string' && 
+                  (cell.toLowerCase().includes('metal') || 
+                   cell.toLowerCase().includes('smelter'))
+                )
+              );
+            }
             
             if (headerRowIndex === -1) {
               throw new Error('Could not find header row in CMRT file');
             }
             
             const headers = jsonData[headerRowIndex] as string[];
+            console.log('CMRT заголовки:', headers);
+            
             const cmrtData: CMRTData[] = [];
             
+            // Данные начинаются с строки после заголовков
             for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
               const row = jsonData[i] as any[];
               if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
                 const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
-                const smelterNameIndex = headers.findIndex(h => h && h.toLowerCase().includes('smelter') && h.toLowerCase().includes('name'));
+                const smelterNameIndex = headers.findIndex(h => h && 
+                  (h.toLowerCase().includes('smelter') && h.toLowerCase().includes('name')) ||
+                  h.toLowerCase().includes('facility name') ||
+                  h.toLowerCase().includes('refinery name')
+                );
                 const countryIndex = headers.findIndex(h => h && h.toLowerCase().includes('country'));
-                const idIndex = headers.findIndex(h => h && h.toLowerCase().includes('identification'));
+                const idIndex = headers.findIndex(h => h && 
+                  (h.toLowerCase().includes('identification') || 
+                   h.toLowerCase().includes('facility id') ||
+                   h.toLowerCase().includes('smelter id'))
+                );
                 
-                cmrtData.push({
-                  metal: row[metalIndex] || '',
-                  smelterName: row[smelterNameIndex] || '',
-                  smelterCountry: row[countryIndex] || '',
-                  smelterIdentificationNumber: row[idIndex] || '',
-                });
+                const smelterName = row[smelterNameIndex] || '';
+                const metal = row[metalIndex] || '';
+                
+                // Добавляем только строки с названием плавильни
+                if (smelterName && smelterName.toString().trim()) {
+                  cmrtData.push({
+                    metal: metal.toString().trim(),
+                    smelterName: smelterName.toString().trim(),
+                    smelterCountry: (row[countryIndex] || '').toString().trim(),
+                    smelterIdentificationNumber: (row[idIndex] || '').toString().trim(),
+                  });
+                }
               }
             }
             
+            console.log('CMRT извлечено записей:', cmrtData.length);
+            console.log('CMRT первые 3 записи:', cmrtData.slice(0, 3));
+            
             resolve({ cmrtData });
           } else if (fileType === 'rmi') {
-            // Parse RMI facility list
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            // Parse RMI facility list - ищем правильный лист
+            let worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            // Проверяем все листы на наличие данных о плавильнях
+            for (const sheetName of workbook.SheetNames) {
+              const sheet = workbook.Sheets[sheetName];
+              const testData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+              const hasRmiData = testData.some((row: any) => 
+                row.some((cell: any) => 
+                  typeof cell === 'string' && 
+                  (cell.toLowerCase().includes('facility') || 
+                   cell.toLowerCase().includes('conformance') ||
+                   cell.toLowerCase().includes('assessment'))
+                )
+              );
+              if (hasRmiData) {
+                worksheet = sheet;
+                break;
+              }
+            }
+            
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            console.log('RMI первые 10 строк:', jsonData.slice(0, 10));
             
             const headerRowIndex = jsonData.findIndex((row: any) => 
               row.some((cell: any) => 
                 typeof cell === 'string' && 
                 (cell.toLowerCase().includes('facility') || 
-                 cell.toLowerCase().includes('standard'))
+                 cell.toLowerCase().includes('standard') ||
+                 cell.toLowerCase().includes('conformance'))
               )
             );
             
@@ -105,24 +156,46 @@ const Index = () => {
             }
             
             const headers = jsonData[headerRowIndex] as string[];
+            console.log('RMI заголовки:', headers);
+            
             const rmiData: RMIData[] = [];
             
             for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
               const row = jsonData[i] as any[];
               if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
-                const facilityIdIndex = headers.findIndex(h => h && h.toLowerCase().includes('facility') && h.toLowerCase().includes('id'));
-                const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('standard') && h.toLowerCase().includes('facility'));
+                const facilityIdIndex = headers.findIndex(h => h && 
+                  (h.toLowerCase().includes('facility') && h.toLowerCase().includes('id')) ||
+                  h.toLowerCase().includes('identification')
+                );
+                const nameIndex = headers.findIndex(h => h && 
+                  (h.toLowerCase().includes('standard') && h.toLowerCase().includes('facility')) ||
+                  h.toLowerCase().includes('facility name') ||
+                  h.toLowerCase().includes('name')
+                );
                 const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
-                const statusIndex = headers.findIndex(h => h && h.toLowerCase().includes('assessment') && h.toLowerCase().includes('status'));
+                const statusIndex = headers.findIndex(h => h && 
+                  (h.toLowerCase().includes('assessment') && h.toLowerCase().includes('status')) ||
+                  h.toLowerCase().includes('conformance') ||
+                  h.toLowerCase().includes('status')
+                );
                 
-                rmiData.push({
-                  facilityId: row[facilityIdIndex] || '',
-                  standardFacilityName: row[nameIndex] || '',
-                  metal: row[metalIndex] || '',
-                  assessmentStatus: row[statusIndex] || '',
-                });
+                const facilityName = row[nameIndex] || '';
+                const status = row[statusIndex] || '';
+                
+                // Добавляем только строки с названием плавильни
+                if (facilityName && facilityName.toString().trim()) {
+                  rmiData.push({
+                    facilityId: (row[facilityIdIndex] || '').toString().trim(),
+                    standardFacilityName: facilityName.toString().trim(),
+                    metal: (row[metalIndex] || '').toString().trim(),
+                    assessmentStatus: status.toString().trim(),
+                  });
+                }
               }
             }
+            
+            console.log('RMI извлечено записей:', rmiData.length);
+            console.log('RMI первые 3 записи:', rmiData.slice(0, 3));
             
             resolve({ rmiData });
           } else {

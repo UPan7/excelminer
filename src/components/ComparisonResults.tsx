@@ -346,7 +346,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               </TableHeader>
               <TableBody>
                 {filteredAndSortedResults.map((result) => (
-                  <React.Fragment key={result.id}>
+                  <tbody key={result.id}>
                     <TableRow className="hover:bg-muted/50">
                       <TableCell>
                         <Collapsible>
@@ -409,7 +409,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                         </TableCell>
                       </TableRow>
                     )}
-                  </React.Fragment>
+                  </tbody>
                 ))}
               </TableBody>
             </Table>

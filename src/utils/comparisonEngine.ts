@@ -51,8 +51,10 @@ export class ComparisonEngine {
     return str
       .toLowerCase()
       .trim()
-      .replace(/[^\\w\\s]/g, '') // Remove special characters
-      .replace(/\s+/g, ' '); // Normalize whitespace
+      .replace(/\b(ltd|inc|corp|corporation|limited|gmbh|sa|llc|co|company)\b\.?/g, '') // Remove company suffixes
+      .replace(/[^\w\s]/g, '') // Remove special characters
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
   }
 
   private isConformantStatus(status: string): boolean {
@@ -61,11 +63,16 @@ export class ComparisonEngine {
       'active',
       'compliant',
       'certified',
-      'approved'
+      'approved',
+      'conform',
+      'valid'
     ];
     
+    const normalizedStatus = status.toLowerCase().trim();
+    console.log('Проверка статуса:', normalizedStatus);
+    
     return conformantStatuses.some(conformantStatus => 
-      status.toLowerCase().includes(conformantStatus)
+      normalizedStatus.includes(conformantStatus)
     );
   }
 
@@ -153,10 +160,14 @@ export class ComparisonEngine {
         matchStatus: 'unknown'
       };
 
+      console.log(`Сравнение плавильни: ${smelter.smelterName}, ID: ${smelter.smelterIdentificationNumber}, Металл: ${smelter.metal}`);
+      
       // Try exact match first
       const exactMatch = this.findExactMatch(smelter);
       
       if (exactMatch) {
+        console.log(`Точное совпадение найдено для ${smelter.smelterName}: ${exactMatch.standardFacilityName}, статус: ${exactMatch.assessmentStatus}`);
+        
         result.matchedFacilityName = exactMatch.standardFacilityName;
         result.matchedFacilityId = exactMatch.facilityId;
         result.rmiAssessmentStatus = exactMatch.assessmentStatus;
@@ -173,6 +184,8 @@ export class ComparisonEngine {
         const fuzzyMatch = this.findFuzzyMatch(smelter);
         
         if (fuzzyMatch) {
+          console.log(`Нечеткое совпадение найдено для ${smelter.smelterName}: ${fuzzyMatch.match.standardFacilityName}, оценка: ${fuzzyMatch.score}, статус: ${fuzzyMatch.match.assessmentStatus}`);
+          
           result.matchedFacilityName = fuzzyMatch.match.standardFacilityName;
           result.matchedFacilityId = fuzzyMatch.match.facilityId;
           result.rmiAssessmentStatus = fuzzyMatch.match.assessmentStatus;
@@ -190,6 +203,8 @@ export class ComparisonEngine {
             // Moderate confidence - needs verification
             result.matchStatus = 'pending-verification';
           }
+        } else {
+          console.log(`Совпадений не найдено для: ${smelter.smelterName}`);
         }
         // If no fuzzy match found, keep status as 'unknown'
       }
