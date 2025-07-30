@@ -18,7 +18,7 @@ export interface ComparisonResult {
   metal: string;
   country: string;
   smelterIdentificationNumber: string;
-  matchStatus: 'conformant' | 'active' | 'non-conformant' | 'attention-required' | 'unknown' | 'pending-verification';
+  matchStatus: 'conformant' | 'active' | 'non-conformant' | 'attention-required';
   rmiAssessmentStatus?: string;
   confidenceScore?: number;
   matchedFacilityName?: string;
@@ -35,8 +35,6 @@ export interface ComparisonSummary {
   active: number;
   nonConformant: number;
   attentionRequired: number;
-  unknown: number;
-  pending: number;
   conformantPercentage: number;
   byMetal: { [metal: string]: { conformant: number; total: number; percentage: number } };
   byStandard: { [standard: string]: { conformant: number; total: number; percentage: number } };
@@ -69,8 +67,6 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     const active = results.filter(r => r.matchStatus === 'active').length;
     const nonConformant = results.filter(r => r.matchStatus === 'non-conformant').length;
     const attentionRequired = results.filter(r => r.matchStatus === 'attention-required').length;
-    const unknown = results.filter(r => r.matchStatus === 'unknown').length;
-    const pending = results.filter(r => r.matchStatus === 'pending-verification').length;
 
     return {
       total,
@@ -78,8 +74,6 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       active,
       nonConformant,
       attentionRequired,
-      unknown,
-      pending,
       conformantPercentage: total > 0 ? Math.round((conformant / total) * 100) : 0
     };
   }, [results]);
@@ -147,10 +141,6 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
         return <XCircle className="h-4 w-4 text-red-600" />;
       case 'attention-required':
         return <AlertCircle className="h-4 w-4 text-orange-600" />;
-      case 'unknown':
-        return <AlertCircle className="h-4 w-4 text-gray-600" />;
-      case 'pending-verification':
-        return <Clock className="h-4 w-4 text-yellow-600" />;
     }
   };
 
@@ -159,15 +149,11 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       case 'conformant':
         return <Badge className="bg-green-600 hover:bg-green-700">Konform</Badge>;
       case 'active':
-        return <Badge className="bg-blue-600 hover:bg-blue-700">Active</Badge>;
+        return <Badge className="bg-blue-600 hover:bg-blue-700">Aktiv</Badge>;
       case 'non-conformant':
         return <Badge variant="destructive">Nicht konform</Badge>;
       case 'attention-required':
         return <Badge className="bg-orange-600 hover:bg-orange-700">Erfordert Aufmerksamkeit</Badge>;
-      case 'unknown':
-        return <Badge className="bg-gray-600 hover:bg-gray-700">Unbekannt</Badge>;
-      case 'pending-verification':
-        return <Badge className="bg-yellow-600 hover:bg-yellow-700">Überprüfung</Badge>;
     }
   };
 
@@ -306,7 +292,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm">Active:</span>
+                    <span className="text-sm">Aktiv:</span>
                     <span className="text-sm font-medium text-blue-600">{summary.active}</span>
                   </div>
                   <div className="flex justify-between">
@@ -316,14 +302,6 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                   <div className="flex justify-between">
                     <span className="text-sm">Erfordert Aufmerksamkeit:</span>
                     <span className="text-sm font-medium text-orange-600">{summary.attentionRequired}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Unbekannt:</span>
-                    <span className="text-sm font-medium text-gray-600">{summary.unknown}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Überprüfung:</span>
-                    <span className="text-sm font-medium text-yellow-600">{summary.pending}</span>
                   </div>
                 </div>
               </div>
@@ -385,7 +363,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <CardTitle className="text-sm font-medium">Aktiv</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{stats.active}</div>
@@ -407,24 +385,6 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{stats.attentionRequired}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Unbekannt</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats.unknown}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Überprüfung</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
           </CardContent>
         </Card>
       </div>
@@ -473,7 +433,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             </div>
 
             <MultiSelect
-              options={['conformant', 'active', 'non-conformant', 'attention-required', 'unknown', 'pending-verification']}
+              options={['conformant', 'active', 'non-conformant', 'attention-required']}
               value={statusFilter}
               onChange={setStatusFilter}
               placeholder="Alle Status"

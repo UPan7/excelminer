@@ -21,7 +21,7 @@ export interface ComparisonResult {
   metal: string;
   country: string;
   smelterIdentificationNumber: string;
-  matchStatus: 'conformant' | 'active' | 'non-conformant' | 'attention-required' | 'unknown' | 'pending-verification';
+  matchStatus: 'conformant' | 'active' | 'non-conformant' | 'attention-required';
   rmiAssessmentStatus?: string;
   confidenceScore?: number;
   matchedFacilityName?: string;
@@ -38,8 +38,6 @@ export interface ComparisonSummary {
   active: number;
   nonConformant: number;
   attentionRequired: number;
-  unknown: number;
-  pending: number;
   conformantPercentage: number;
   byMetal: { [metal: string]: { conformant: number; total: number; percentage: number } };
   byStandard: { [standard: string]: { conformant: number; total: number; percentage: number } };
@@ -215,7 +213,7 @@ export class ComparisonEngine {
     cmrtData.forEach((smelter, index) => {
       const resultId = `${supplierName}-${index}`;
       
-      // Start with unknown status
+      // Start with attention-required status
       let result: ComparisonResult = {
         id: resultId,
         supplierName,
@@ -223,7 +221,7 @@ export class ComparisonEngine {
         metal: smelter.metal,
         country: smelter.smelterCountry,
         smelterIdentificationNumber: smelter.smelterIdentificationNumber,
-        matchStatus: 'unknown'
+        matchStatus: 'attention-required'
       };
 
       console.log(`Сравнение плавильни: ${smelter.smelterName}, ID: ${smelter.smelterIdentificationNumber}, Металл: ${smelter.metal}`);
@@ -258,19 +256,16 @@ export class ComparisonEngine {
           result.matchedStandards = fuzzyMatch.standards;
           result.sourceStandard = fuzzyMatch.standards[0];
           
-          // For fuzzy matches, mark as pending verification if confidence is moderate
+          // For fuzzy matches with high confidence
           if (fuzzyMatch.score >= 0.8) {
-            // High confidence fuzzy match
             const conformityStatus = this.getConformityStatus(fuzzyMatch.match.assessmentStatus);
             result.matchStatus = conformityStatus;
           } else {
-            // Moderate confidence - needs verification
-            result.matchStatus = 'pending-verification';
+            // Moderate confidence - mark as attention required
+            result.matchStatus = 'attention-required';
           }
-        } else {
-          console.log(`Совпадений не найдено для: ${smelter.smelterName}`);
         }
-        // If no fuzzy match found, keep status as 'unknown'
+        // If no fuzzy match found, keep status as 'attention-required'
       }
 
       results.push(result);
@@ -285,8 +280,6 @@ export class ComparisonEngine {
     const active = results.filter(r => r.matchStatus === 'active').length;
     const nonConformant = results.filter(r => r.matchStatus === 'non-conformant').length;
     const attentionRequired = results.filter(r => r.matchStatus === 'attention-required').length;
-    const unknown = results.filter(r => r.matchStatus === 'unknown').length;
-    const pending = results.filter(r => r.matchStatus === 'pending-verification').length;
 
     // Calculate by metal
     const byMetal: { [metal: string]: { conformant: number; total: number; percentage: number } } = {};
@@ -329,8 +322,6 @@ export class ComparisonEngine {
       active,
       nonConformant,
       attentionRequired,
-      unknown,
-      pending,
       conformantPercentage: total > 0 ? Math.round((conformant / total) * 100) : 0,
       byMetal,
       byStandard
