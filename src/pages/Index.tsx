@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertTriangle, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -535,15 +536,12 @@ const Index = () => {
     if (!organizationTemplate || comparisonResults.length === 0) return;
 
     try {
-      const templateData = organizationTemplate.file_data;
-      const workbook = XLSX.utils.book_new();
-
-      // Rebuild the workbook from stored data
-      templateData.sheetNames.forEach((sheetName: string) => {
-        const sheetData = templateData.sheets[sheetName];
-        workbook.Sheets[sheetName] = sheetData;
-      });
-      workbook.SheetNames = templateData.sheetNames;
+      // Get the template file data stored as binary
+      const templateBinaryData = organizationTemplate.file_data.binaryData;
+      
+      // Create a new ExcelJS workbook from the template buffer
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(Buffer.from(templateBinaryData, 'base64'));
 
       // Get unique smelters with consolidated information
       const uniqueSmelters = new Map();
@@ -565,104 +563,92 @@ const Index = () => {
         }
       });
 
-      // Fill the Smelter List sheet
-      if (workbook.Sheets['Smelter List']) {
-        const smelterSheet = workbook.Sheets['Smelter List'];
-        
-        // Clear existing data from row 5 onwards
-        const range = XLSX.utils.decode_range(smelterSheet['!ref'] || 'A1');
-        for (let row = 4; row <= range.e.r; row++) {
-          for (let col = 0; col <= range.e.c; col++) {
-            const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
-            delete smelterSheet[cellRef];
+      // Fill the Smelter List worksheet
+      const smelterWorksheet = workbook.getWorksheet('Smelter List');
+      if (smelterWorksheet) {
+        // Clear existing data from row 5 onwards, but preserve formatting
+        const maxRow = Math.max(100, smelterWorksheet.rowCount); // Ensure we clear enough rows
+        for (let rowNum = 5; rowNum <= maxRow; rowNum++) {
+          const row = smelterWorksheet.getRow(rowNum);
+          for (let colNum = 1; colNum <= 17; colNum++) { // A to Q
+            const cell = row.getCell(colNum);
+            cell.value = null; // Clear value but keep formatting
           }
         }
 
-        let currentRow = 4; // Start at row 5 (0-indexed)
-        
+        // Insert the consolidated smelter data starting at row 5
+        let currentRow = 5;
         Array.from(uniqueSmelters.values()).forEach((smelter: any) => {
-          // Column mapping for CMRT template
-          const rowData = {
-            A: '', // Smelter Identification Number Input Column
-            B: smelter.metal, // Metal (*)
-            C: smelter.rmiName, // Smelter Look-up (*)
-            D: smelter.smelterName, // Smelter Name (1)
-            E: smelter.country, // Smelter Country (*)
-            F: smelter.smelterId, // Smelter Identification
-            G: smelter.smelterId ? 'RMI' : '', // Source of Smelter Identification Number
-            H: '', // Smelter Street
-            I: '', // Smelter City
-            J: '', // Smelter Facility Location: State / Province
-            K: '', // Smelter Contact Name
-            L: '', // Smelter Contact Email
-            M: '', // Proposed next steps
-            N: '', // Name of Mine(s)
-            O: '', // Location (Country) of Mine(s)
-            P: '', // 100% recycled/scrap sources
-            Q: `Status: ${smelter.conformityStatus} | Reported by: ${Array.from(smelter.suppliers).join(', ')} | Verified on: ${new Date().toLocaleDateString('de-DE')}`
-          };
-
-          Object.entries(rowData).forEach(([col, value]) => {
-            if (value) {
-              const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col.charCodeAt(0) - 65 });
-              smelterSheet[cellRef] = { v: value, t: 's' };
-            }
-          });
-
+          const row = smelterWorksheet.getRow(currentRow);
+          
+          // Fill columns according to CMRT template structure
+          row.getCell(1).value = smelter.smelterId; // Column A: Same as column F
+          row.getCell(2).value = smelter.metal; // Column B: Metal (*)
+          row.getCell(3).value = smelter.rmiName; // Column C: Smelter Look-up (*)
+          row.getCell(4).value = smelter.smelterName; // Column D: Smelter Name (1)
+          row.getCell(5).value = smelter.country; // Column E: Smelter Country (*)
+          row.getCell(6).value = smelter.smelterId; // Column F: Smelter Identification
+          row.getCell(7).value = smelter.smelterId ? 'RMI' : ''; // Column G: Source
+          // Columns H-P are left empty as per instructions
+          row.getCell(17).value = `Status: ${smelter.conformityStatus}\nReported by: ${Array.from(smelter.suppliers).join(', ')}\nVerified on: ${new Date().toLocaleDateString('de-DE')}`; // Column Q: Comments
+          
           currentRow++;
         });
-
-        // Update sheet range
-        const newRange = `A1:Q${currentRow}`;
-        smelterSheet['!ref'] = newRange;
       }
 
       // Update Declaration sheet
-      if (workbook.Sheets['Declaration']) {
-        const declarationSheet = workbook.Sheets['Declaration'];
-        
-        // Update effective date (assuming it's in a specific cell)
-        const effectiveDateCells = ['C6', 'D6', 'E6', 'F6']; // Common locations for effective date
+      const declarationWorksheet = workbook.getWorksheet('Declaration');
+      if (declarationWorksheet) {
         const currentDate = new Date().toLocaleDateString('de-DE');
         
-        effectiveDateCells.forEach(cellRef => {
-          if (declarationSheet[cellRef] && 
-              declarationSheet[cellRef].v && 
-              declarationSheet[cellRef].v.toString().toLowerCase().includes('effective')) {
-            declarationSheet[cellRef] = { v: currentDate, t: 's' };
-          }
+        // Try to find and update effective date - scan for cells containing "effective"
+        declarationWorksheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell, colNumber) => {
+            if (cell.value && typeof cell.value === 'string' && 
+                cell.value.toLowerCase().includes('effective date')) {
+              // Update adjacent or nearby cell with current date
+              const targetCell = declarationWorksheet.getCell(rowNumber, colNumber + 1) || 
+                                 declarationWorksheet.getCell(rowNumber + 1, colNumber);
+              if (targetCell) {
+                targetCell.value = currentDate;
+              }
+            }
+          });
         });
 
-        // Update description with consolidation info
+        // Update description of scope with consolidation info
         const totalSuppliers = new Set(comparisonResults.map(r => r.supplierName)).size;
         const descriptionText = `Consolidated from ${totalSuppliers} suppliers, checked on ${currentDate}`;
         
-        // Try to find and update description field
-        const range = XLSX.utils.decode_range(declarationSheet['!ref'] || 'A1');
-        for (let row = 0; row <= range.e.r; row++) {
-          for (let col = 0; col <= range.e.c; col++) {
-            const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
-            const cell = declarationSheet[cellRef];
-            if (cell && cell.v && 
-                typeof cell.v === 'string' && 
-                cell.v.toLowerCase().includes('description of scope')) {
-              // Update the cell below or next to it
-              const nextCellRef = XLSX.utils.encode_cell({ r: row, c: col + 1 });
-              const belowCellRef = XLSX.utils.encode_cell({ r: row + 1, c: col });
-              
-              if (declarationSheet[nextCellRef]) {
-                declarationSheet[nextCellRef] = { v: descriptionText, t: 's' };
-              } else if (declarationSheet[belowCellRef]) {
-                declarationSheet[belowCellRef] = { v: descriptionText, t: 's' };
+        // Find description of scope field and update adjacent cell
+        declarationWorksheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell, colNumber) => {
+            if (cell.value && typeof cell.value === 'string' && 
+                cell.value.toLowerCase().includes('description of scope')) {
+              const targetCell = declarationWorksheet.getCell(rowNumber, colNumber + 1) || 
+                                 declarationWorksheet.getCell(rowNumber + 1, colNumber);
+              if (targetCell) {
+                targetCell.value = descriptionText;
               }
-              break;
             }
-          }
-        }
+          });
+        });
       }
 
+      // Generate the output file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+
+      // Download the file
       const fileName = `${organizationTemplate.company_name || 'Organization'}_Consolidated_CMRT_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
 
       toast({
         title: "Vorlage erfolgreich ausgefüllt",

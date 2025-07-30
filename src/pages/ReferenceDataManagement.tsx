@@ -406,13 +406,18 @@ const ReferenceDataManagement = () => {
         }
       }
 
-      // Store the entire workbook structure
+      // Store the binary data for ExcelJS compatibility
+      const base64Data = btoa(
+        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      
       const fileData = {
+        binaryData: base64Data,
         sheets: {},
         sheetNames: workbook.SheetNames
       };
 
-      // Store all sheets
+      // Store all sheets for backward compatibility
       workbook.SheetNames.forEach(sheetName => {
         fileData.sheets[sheetName] = workbook.Sheets[sheetName];
       });
