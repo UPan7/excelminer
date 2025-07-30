@@ -536,6 +536,17 @@ const Index = () => {
     if (!organizationTemplate || comparisonResults.length === 0) return;
 
     try {
+      // Check if template has binary data (new format) or fall back to old format
+      if (!organizationTemplate.file_data.binaryData) {
+        toast({
+          title: "Template-Format nicht unterstützt",
+          description: "Bitte laden Sie die Organisationsvorlage erneut hoch, um die neue Export-Funktion zu nutzen.",
+          variant: "destructive",
+        });
+        setShowExportDialog(false);
+        return;
+      }
+
       // Get the template file data stored as binary
       const templateBinaryData = organizationTemplate.file_data.binaryData;
       
