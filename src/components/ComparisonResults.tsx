@@ -444,23 +444,28 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                   >
                     Metall
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('country')}
-                  >
-                    Land
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('matchStatus')}
-                  >
-                    Status
-                  </TableHead>
-                  <TableHead>Vertrauen</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAndSortedResults.map((result) => (
+                   <TableHead 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => handleSort('country')}
+                   >
+                     Land
+                   </TableHead>
+                   <TableHead 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => handleSort('smelterIdentificationNumber')}
+                   >
+                     Smelzerei-ID
+                   </TableHead>
+                   <TableHead 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => handleSort('matchStatus')}
+                   >
+                     Status
+                   </TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {filteredAndSortedResults.map((result) => (
                   <React.Fragment key={result.id}>
                     <TableRow className="hover:bg-muted/50">
                       <TableCell>
@@ -480,23 +485,17 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                           </CollapsibleTrigger>
                         </Collapsible>
                       </TableCell>
-                      <TableCell className="font-medium">{result.supplierName}</TableCell>
-                      <TableCell>{result.smelterName}</TableCell>
-                      <TableCell>{result.metal}</TableCell>
-                      <TableCell>{result.country}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(result.matchStatus)}
-                          {getStatusBadge(result.matchStatus)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {result.confidenceScore && (
-                          <span className="text-sm">
-                            {Math.round(result.confidenceScore * 100)}%
-                          </span>
-                        )}
-                      </TableCell>
+                       <TableCell className="font-medium">{result.supplierName}</TableCell>
+                       <TableCell>{result.smelterName}</TableCell>
+                       <TableCell>{result.metal}</TableCell>
+                       <TableCell>{result.country}</TableCell>
+                       <TableCell>{result.smelterIdentificationNumber || 'N/A'}</TableCell>
+                       <TableCell>
+                         <div className="flex items-center gap-2">
+                           {getStatusIcon(result.matchStatus)}
+                           {getStatusBadge(result.matchStatus)}
+                         </div>
+                       </TableCell>
                     </TableRow>
                     {expandedRows.has(result.id) && (
                       <TableRow>
