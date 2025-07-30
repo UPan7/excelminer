@@ -19,6 +19,7 @@ interface SupplierFileData {
   status: 'pending' | 'processing' | 'complete' | 'error';
   size: number;
   data?: CMRTData[];
+  supplierName?: string;
   error?: string;
 }
 
@@ -136,7 +137,7 @@ const Index = () => {
     return result;
   };
 
-  const parseSupplierFile = async (file: File): Promise<CMRTData[]> => {
+  const parseSupplierFile = async (file: File): Promise<{ supplierName: string; smelterData: CMRTData[] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       const isCSV = file.name.toLowerCase().endsWith('.csv');
@@ -144,6 +145,7 @@ const Index = () => {
       reader.onload = (e) => {
         try {
           let jsonData: any[][];
+          let supplierName = file.name.replace(/\.(xlsx|xls|csv)$/i, '');
           
           if (isCSV) {
             const text = e.target?.result as string;
@@ -151,6 +153,29 @@ const Index = () => {
           } else {
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
+            
+            // Try to extract supplier name from Declaration sheet
+            if (workbook.Sheets['Declaration']) {
+              try {
+                const declarationSheet = workbook.Sheets['Declaration'];
+                const declarationData = XLSX.utils.sheet_to_json(declarationSheet, { header: 1 });
+                
+                // Look for company name in D8 (or merged range D8:G8)
+                const companyNameRow = declarationData[7] as any[]; // Row 8 (0-indexed)
+                if (companyNameRow) {
+                  // Check cells D8, E8, F8, G8 (columns 3, 4, 5, 6)
+                  for (let col = 3; col <= 6; col++) {
+                    if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && companyNameRow[col].trim()) {
+                      supplierName = companyNameRow[col].trim();
+                      break;
+                    }
+                  }
+                }
+              } catch (declarationError) {
+                console.warn('Could not extract supplier name from Declaration sheet:', declarationError);
+              }
+            }
+            
             let worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
             jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
           }
@@ -210,7 +235,7 @@ const Index = () => {
             }
           }
           
-          resolve(supplierData);
+          resolve({ supplierName, smelterData: supplierData });
         } catch (error) {
           reject(error);
         }
@@ -231,17 +256,17 @@ const Index = () => {
     ));
 
     try {
-      const supplierData = await parseSupplierFile(file);
+      const result = await parseSupplierFile(file);
       
       setSupplierFiles(prev => prev.map(f => 
         f.id === fileData.id 
-          ? { ...f, status: 'complete', data: supplierData }
+          ? { ...f, status: 'complete', data: result.smelterData, supplierName: result.supplierName }
           : f
       ));
 
       toast({
         title: "Lieferantendatei erfolgreich verarbeitet",
-        description: `${file.name} wurde geparst: ${supplierData.length} Schmelzereien gefunden.`,
+        description: `${file.name} wurde geparst: ${result.smelterData.length} Schmelzereien gefunden. Lieferant: ${result.supplierName}`,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
@@ -360,7 +385,7 @@ const Index = () => {
             settings.metals.includes(item.metal)
           );
 
-          const supplierName = supplierFile.name.replace(/\.(xlsx|xls|csv)$/i, '');
+          const supplierName = supplierFile.supplierName || supplierFile.name.replace(/\.(xlsx|xls|csv)$/i, '');
           const results = engine.compareSupplierData(supplierName, filteredData);
           allResults.push(...results);
         }
@@ -807,6 +832,9 @@ const Index = () => {
                           <p className="text-sm text-muted-foreground">
                             {(file.size / 1024 / 1024).toFixed(2)} MB
                             {file.data && ` • ${file.data.length} Schmelzereien gefunden`}
+                            {file.supplierName && file.supplierName !== file.name.replace(/\.(xlsx|xls|csv)$/i, '') && (
+                              <span className="block">Lieferant: {file.supplierName}</span>
+                            )}
                           </p>
                           {file.error && (
                             <p className="text-sm text-destructive mt-1">{file.error}</p>
