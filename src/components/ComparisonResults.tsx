@@ -169,7 +169,11 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     onChange: (value: string[]) => void; 
     placeholder: string;
   }) => {
-    const handleToggle = (option: string) => {
+    const [open, setOpen] = useState(false);
+
+    const handleToggle = (option: string, event: React.MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
       const newValue = value.includes(option)
         ? value.filter(v => v !== option)
         : [...value, option];
@@ -177,11 +181,12 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     };
 
     return (
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             className="justify-between w-full"
+            onClick={() => setOpen(!open)}
           >
             <span className="truncate">
               {value.length === 0 
@@ -200,7 +205,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               <div
                 key={option}
                 className="flex items-center space-x-2 px-4 py-2 hover:bg-muted cursor-pointer"
-                onClick={() => handleToggle(option)}
+                onClick={(e) => handleToggle(option, e)}
               >
                 <Checkbox
                   checked={value.includes(option)}
