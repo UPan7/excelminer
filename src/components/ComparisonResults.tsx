@@ -334,10 +334,25 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                 {filteredAndSortedResults.length} von {results.length} Schmelzen
               </CardDescription>
             </div>
-            <Button onClick={exportToExcel} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Excel exportieren
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setMetalFilter('all');
+                  setSupplierFilter('all');
+                  setCountryFilter('all');
+                }}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Löschen
+              </Button>
+              <Button onClick={exportToExcel} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Excel exportieren
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -402,22 +417,6 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             </Select>
           </div>
 
-          {/* Clear filters button row */}
-          <div className="mt-2">
-            <Button
-              variant="outline" 
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-                setMetalFilter('all');
-                setSupplierFilter('all');
-                setCountryFilter('all');
-              }}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Löschen
-            </Button>
-          </div>
         </CardHeader>
 
         <CardContent>
