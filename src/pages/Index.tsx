@@ -241,7 +241,7 @@ const Index = () => {
 
       toast({
         title: "Lieferantendatei erfolgreich verarbeitet",
-        description: `${file.name} wurde geparst: ${supplierData.length} Schmelzen gefunden.`,
+        description: `${file.name} wurde geparst: ${supplierData.length} Schmelzereien gefunden.`,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
@@ -372,7 +372,7 @@ const Index = () => {
 
       toast({
         title: "Vergleich abgeschlossen",
-        description: `${allResults.length} Schmelzen geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
+        description: `${allResults.length} Schmelzereien geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
       });
 
     } catch (error) {
@@ -481,7 +481,7 @@ const Index = () => {
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-4">ExcelMiner</h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Professionelles Tool zum Vergleich von Lieferanten-Schmelzen mit Referenzdaten.
+              Professionelles Tool zum Vergleich von Lieferanten-Schmelzereien mit Referenzdaten.
               Wählen Sie Standards und Metalle aus und laden Sie Ihre Lieferantendateien hoch.
             </p>
           </div>
@@ -600,54 +600,24 @@ const Index = () => {
                       </Button>
                     </div>
                   </div>
-
-                  {/* Group metals by standards */}
-                  <div className="space-y-4">
-                    {/* CMRT Standards */}
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2">CMRT Standards</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {['Gold', 'Tin'].filter(metal => availableMetals.includes(metal)).map(metal => (
-                          <div key={metal} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`metal-${metal}`}
-                              checked={settings.metals.includes(metal)}
-                              onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
-                            />
-                            <Label 
-                              htmlFor={`metal-${metal}`}
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              {metal}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* EMRT Standards */}
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2">EMRT Standards</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {['Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal)).map(metal => (
-                          <div key={metal} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`metal-${metal}`}
-                              checked={settings.metals.includes(metal)}
-                              onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
-                            />
-                            <Label 
-                              htmlFor={`metal-${metal}`}
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              {metal}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
                   
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {['Gold', 'Tin', 'Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal)).map(metal => (
+                      <div key={metal} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`metal-${metal}`}
+                          checked={settings.metals.includes(metal)}
+                          onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
+                        />
+                        <Label 
+                          htmlFor={`metal-${metal}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {metal}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                   {settings.metals.length === 0 && (
                     <p className="text-sm text-amber-600">
                       ⚠️ Wählen Sie mindestens ein Metall aus
@@ -806,7 +776,7 @@ const Index = () => {
                           <p className="font-medium">{file.name}</p>
                           <p className="text-sm text-muted-foreground">
                             {(file.size / 1024 / 1024).toFixed(2)} MB
-                            {file.data && ` • ${file.data.length} Schmelzen gefunden`}
+                            {file.data && ` • ${file.data.length} Schmelzereien gefunden`}
                           </p>
                           {file.error && (
                             <p className="text-sm text-destructive mt-1">{file.error}</p>
@@ -837,7 +807,7 @@ const Index = () => {
                 <CardHeader>
                   <CardTitle>Vergleichsergebnis</CardTitle>
                   <CardDescription>
-                    Geprüft: {comparisonResults.length} Schmelzen | 
+                    Geprüft: {comparisonResults.length} Schmelzereien | 
                     Standards: {settings.standards.join(', ')} | 
                     Metalle: {settings.metals.join(', ')}
                   </CardDescription>
