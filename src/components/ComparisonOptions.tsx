@@ -124,7 +124,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
   };
 
   const formatDate = (dateString?: string) => {
-    return dateString ? new Date(dateString).toLocaleDateString('ru-RU') : 'Не загружено';
+    return dateString ? new Date(dateString).toLocaleDateString('de-DE') : 'Nicht hochgeladen';
   };
 
   return (
@@ -140,17 +140,17 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
                 ) : (
                   <AlertTriangle className="h-5 w-5 text-amber-500" />
                 )}
-                Статус эталонной базы данных
+                Status der Referenzdatenbank
               </CardTitle>
               <CardDescription>
                 {dbStatus.isReady 
-                  ? `База готова к использованию • ${dbStatus.totalRecords.toLocaleString()} записей`
-                  : 'Требуется загрузка эталонных данных'
+                  ? `Die Basis ist einsatzbereit • ${dbStatus.totalRecords.toLocaleString()} Einträge`
+                  : 'Referenzdaten müssen hochgeladen werden'
                 }
               </CardDescription>
             </div>
             <Badge variant={dbStatus.isReady ? "default" : "secondary"}>
-              {dbStatus.isReady ? "✓ Ready" : "⚠️ Update needed"}
+              {dbStatus.isReady ? "✓ Bereit" : "⚠️ Aktualisierung erforderlich"}
             </Badge>
           </div>
         </CardHeader>
@@ -172,7 +172,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
           
           {dbStatus.lastUpdated && (
             <div className="mt-4 pt-4 border-t text-sm text-muted-foreground">
-              Последнее обновление: {formatDate(dbStatus.lastUpdated)}
+              Letzte Aktualisierung: {formatDate(dbStatus.lastUpdated)}
             </div>
           )}
         </CardContent>
@@ -183,17 +183,17 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Параметры сравнения
+            Abgleichsparameter
           </CardTitle>
           <CardDescription>
-            Выберите стандарты и металлы для проверки соответствия
+            Wählen Sie Standards und Metalle zur Konformitätsprüfung aus.
           </CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-6">
           {/* Standards Selection */}
           <div className="space-y-3">
-            <Label className="text-base font-medium">Стандарты для сравнения</Label>
+            <Label className="text-base font-medium">Standards zum Abgleich</Label>
             <div className="grid grid-cols-3 gap-4">
               {AVAILABLE_STANDARDS.map(standard => (
                 <div key={standard} className="flex items-center space-x-2">
@@ -217,7 +217,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
             </div>
             {settings.standards.length === 0 && (
               <p className="text-sm text-amber-600">
-                ⚠️ Выберите хотя бы один стандарт для сравнения
+                ⚠️ Wählen Sie mindestens einen Standard zum Abgleich aus.
               </p>
             )}
           </div>
@@ -227,7 +227,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
           {/* Metals Selection */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Металлы для проверки</Label>
+              <Label className="text-base font-medium">Metalle zum Abgleich</Label>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
@@ -267,29 +267,29 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
             </div>
             {settings.metals.length === 0 && (
               <p className="text-sm text-amber-600">
-                ⚠️ Выберите хотя бы один металл для проверки
+                ⚠️ Wählen Sie mindestens ein Metall zum Abgleich aus.
               </p>
             )}
           </div>
 
           {/* Settings Summary */}
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-medium mb-2">Выбранные параметры:</h4>
+            <h4 className="font-medium mb-2">Ausgewählte Parameter:</h4>
             <div className="space-y-2">
               <div>
-                <span className="text-sm text-muted-foreground">Стандарты: </span>
+                <span className="text-sm text-muted-foreground">Standards: </span>
                 {settings.standards.length > 0 ? (
                   <span className="text-sm font-medium">{settings.standards.join(', ')}</span>
                 ) : (
-                  <span className="text-sm text-muted-foreground italic">не выбраны</span>
+                  <span className="text-sm text-muted-foreground italic">nicht ausgewählt</span>
                 )}
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Металлы: </span>
+                <span className="text-sm text-muted-foreground">Metalle: </span>
                 {settings.metals.length > 0 ? (
                   <span className="text-sm font-medium">{settings.metals.join(', ')}</span>
                 ) : (
-                  <span className="text-sm text-muted-foreground italic">не выбраны</span>
+                  <span className="text-sm text-muted-foreground italic">nicht ausgewählt</span>
                 )}
               </div>
             </div>
