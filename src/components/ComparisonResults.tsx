@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Download, ChevronDown, ChevronRight, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Search, Filter, Download, ChevronDown, ChevronRight, AlertCircle, CheckCircle, XCircle, Clock, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 
 export interface ComparisonResult {
@@ -50,10 +52,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
   summary
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [metalFilter, setMetalFilter] = useState<string>('all');
-  const [supplierFilter, setSupplierFilter] = useState<string>('all');
-  const [countryFilter, setCountryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [metalFilter, setMetalFilter] = useState<string[]>([]);
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof ComparisonResult>('smelterName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -100,10 +102,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
         result.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === 'all' || result.matchStatus === statusFilter;
-      const matchesMetal = metalFilter === 'all' || result.metal === metalFilter;
-      const matchesSupplier = supplierFilter === 'all' || result.supplierName === supplierFilter;
-      const matchesCountry = countryFilter === 'all' || result.country === countryFilter;
+      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(result.matchStatus);
+      const matchesMetal = metalFilter.length === 0 || metalFilter.includes(result.metal);
+      const matchesSupplier = supplierFilter.length === 0 || supplierFilter.includes(result.supplierName);
+      const matchesCountry = countryFilter.length === 0 || countryFilter.includes(result.country);
 
       return matchesSearch && matchesStatus && matchesMetal && matchesSupplier && matchesCountry;
     });
@@ -153,6 +155,64 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       case 'pending-verification':
         return <Badge className="bg-yellow-600 hover:bg-yellow-700">Überprüfung</Badge>;
     }
+  };
+
+  // Multi-select component
+  const MultiSelect = ({ 
+    options, 
+    value, 
+    onChange, 
+    placeholder 
+  }: { 
+    options: string[]; 
+    value: string[]; 
+    onChange: (value: string[]) => void; 
+    placeholder: string;
+  }) => {
+    const handleToggle = (option: string) => {
+      const newValue = value.includes(option)
+        ? value.filter(v => v !== option)
+        : [...value, option];
+      onChange(newValue);
+    };
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="justify-between w-full"
+          >
+            <span className="truncate">
+              {value.length === 0 
+                ? placeholder 
+                : value.length === 1 
+                  ? value[0] 
+                  : `${value.length} ausgewählt`
+              }
+            </span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0 bg-background z-50" align="start">
+          <div className="max-h-64 overflow-auto">
+            {options.map((option) => (
+              <div
+                key={option}
+                className="flex items-center space-x-2 px-4 py-2 hover:bg-muted cursor-pointer"
+                onClick={() => handleToggle(option)}
+              >
+                <Checkbox
+                  checked={value.includes(option)}
+                  onChange={() => {}} // Handled by parent onClick
+                />
+                <span className="text-sm">{option}</span>
+              </div>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   };
 
   const toggleRowExpansion = (id: string) => {
@@ -339,10 +399,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                 variant="outline" 
                 onClick={() => {
                   setSearchTerm('');
-                  setStatusFilter('all');
-                  setMetalFilter('all');
-                  setSupplierFilter('all');
-                  setCountryFilter('all');
+                  setStatusFilter([]);
+                  setMetalFilter([]);
+                  setSupplierFilter([]);
+                  setCountryFilter([]);
                 }}
               >
                 <Filter className="h-4 w-4 mr-2" />
@@ -367,54 +427,33 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Status</SelectItem>
-                <SelectItem value="conformant">Konform</SelectItem>
-                <SelectItem value="non-conformant">Nicht-konform</SelectItem>
-                <SelectItem value="unknown">Unbekannt</SelectItem>
-                <SelectItem value="pending-verification">Überprüfung</SelectItem>
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={['conformant', 'non-conformant', 'unknown', 'pending-verification']}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="Alle Status"
+            />
 
-            <Select value={metalFilter} onValueChange={setMetalFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Metalle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Metalle</SelectItem>
-                {uniqueMetals.map(metal => (
-                  <SelectItem key={metal} value={metal}>{metal}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={uniqueMetals}
+              value={metalFilter}
+              onChange={setMetalFilter}
+              placeholder="Alle Metalle"
+            />
 
-            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Lieferanten" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Lieferanten</SelectItem>
-                {uniqueSuppliers.map(supplier => (
-                  <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={uniqueSuppliers}
+              value={supplierFilter}
+              onChange={setSupplierFilter}
+              placeholder="Alle Lieferanten"
+            />
 
-            <Select value={countryFilter} onValueChange={setCountryFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Länder" />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                <SelectItem value="all">Alle Länder</SelectItem>
-                {uniqueCountries.map(country => (
-                  <SelectItem key={country} value={country}>{country}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={uniqueCountries}
+              value={countryFilter}
+              onChange={setCountryFilter}
+              placeholder="Alle Länder"
+            />
           </div>
 
         </CardHeader>
