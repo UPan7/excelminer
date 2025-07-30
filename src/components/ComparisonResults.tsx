@@ -433,10 +433,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                     Lieferant
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 w-32"
                     onClick={() => handleSort('smelterName')}
                   >
-                    Schmelzname
+                    Schmelzereiname
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
