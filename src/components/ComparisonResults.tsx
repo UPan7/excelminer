@@ -341,7 +341,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+          <div className="grid grid-cols-5 gap-4 mt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
