@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      organization_templates: {
+        Row: {
+          cmrt_version: string | null
+          company_name: string | null
+          file_data: Json
+          id: string
+          is_active: boolean
+          template_name: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          cmrt_version?: string | null
+          company_name?: string | null
+          file_data: Json
+          id?: string
+          is_active?: boolean
+          template_name: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          cmrt_version?: string | null
+          company_name?: string | null
+          file_data?: Json
+          id?: string
+          is_active?: boolean
+          template_name?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

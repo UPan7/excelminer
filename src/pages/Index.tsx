@@ -12,6 +12,8 @@ import { ComparisonResults, type ComparisonResult, type ComparisonSummary } from
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface SupplierFileData {
   id: string;
@@ -58,11 +60,35 @@ const Index = () => {
   });
   const [availableMetals, setAvailableMetals] = useState<string[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | undefined>(undefined);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportOption, setExportOption] = useState<'raw' | 'template'>('raw');
+  const [organizationTemplate, setOrganizationTemplate] = useState<any | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     loadDatabaseStatus();
+    loadOrganizationTemplate();
   }, []);
+
+  const loadOrganizationTemplate = async () => {
+    try {
+      const { data: templateData, error: templateError } = await supabase
+        .from('organization_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('uploaded_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (templateError && templateError.code !== 'PGRST116') {
+        console.warn('Error loading template:', templateError);
+      }
+
+      setOrganizationTemplate(templateData || null);
+    } catch (error) {
+      console.error('Error loading organization template:', error);
+    }
+  };
 
   const loadDatabaseStatus = async () => {
     try {
@@ -465,6 +491,193 @@ const Index = () => {
       ...settings,
       metals: []
     });
+  };
+
+  const handleExport = () => {
+    if (organizationTemplate) {
+      setShowExportDialog(true);
+    } else {
+      exportRawResults();
+    }
+  };
+
+  const exportRawResults = () => {
+    if (comparisonResults.length === 0) return;
+
+    const exportData = comparisonResults.map(result => ({
+      'Lieferant': result.supplierName,
+      'Schmelzerei': result.smelterName,
+      'Metall': result.metal,
+      'Land': result.country,
+      'Smelter ID': result.smelterIdentificationNumber || '',
+      'Status': result.matchStatus,
+      'Match Status': result.matchStatus,
+      'RMI Name': result.matchedFacilityName || '',
+      'Vergleichsdatum': new Date().toLocaleDateString('de-DE')
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Comparison Results');
+
+    const fileName = `ExcelMiner_Results_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({
+      title: "Export erfolgreich",
+      description: `Datei ${fileName} wurde heruntergeladen`,
+    });
+    
+    setShowExportDialog(false);
+  };
+
+  const exportFilledTemplate = async () => {
+    if (!organizationTemplate || comparisonResults.length === 0) return;
+
+    try {
+      const templateData = organizationTemplate.file_data;
+      const workbook = XLSX.utils.book_new();
+
+      // Rebuild the workbook from stored data
+      templateData.sheetNames.forEach((sheetName: string) => {
+        const sheetData = templateData.sheets[sheetName];
+        workbook.Sheets[sheetName] = sheetData;
+      });
+      workbook.SheetNames = templateData.sheetNames;
+
+      // Get unique smelters with consolidated information
+      const uniqueSmelters = new Map();
+      comparisonResults.forEach(result => {
+        const key = `${result.smelterName}_${result.metal}`;
+        if (!uniqueSmelters.has(key)) {
+          uniqueSmelters.set(key, {
+            smelterName: result.smelterName,
+            metal: result.metal,
+            country: result.country,
+            smelterId: result.smelterIdentificationNumber || '',
+            conformityStatus: result.matchStatus,
+            suppliers: new Set([result.supplierName]),
+            rmiName: result.matchedFacilityName || result.smelterName
+          });
+        } else {
+          const existing = uniqueSmelters.get(key);
+          existing.suppliers.add(result.supplierName);
+        }
+      });
+
+      // Fill the Smelter List sheet
+      if (workbook.Sheets['Smelter List']) {
+        const smelterSheet = workbook.Sheets['Smelter List'];
+        
+        // Clear existing data from row 5 onwards
+        const range = XLSX.utils.decode_range(smelterSheet['!ref'] || 'A1');
+        for (let row = 4; row <= range.e.r; row++) {
+          for (let col = 0; col <= range.e.c; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+            delete smelterSheet[cellRef];
+          }
+        }
+
+        let currentRow = 4; // Start at row 5 (0-indexed)
+        
+        Array.from(uniqueSmelters.values()).forEach((smelter: any) => {
+          // Column mapping for CMRT template
+          const rowData = {
+            A: '', // Smelter Identification Number Input Column
+            B: smelter.metal, // Metal (*)
+            C: smelter.rmiName, // Smelter Look-up (*)
+            D: smelter.smelterName, // Smelter Name (1)
+            E: smelter.country, // Smelter Country (*)
+            F: smelter.smelterId, // Smelter Identification
+            G: smelter.smelterId ? 'RMI' : '', // Source of Smelter Identification Number
+            H: '', // Smelter Street
+            I: '', // Smelter City
+            J: '', // Smelter Facility Location: State / Province
+            K: '', // Smelter Contact Name
+            L: '', // Smelter Contact Email
+            M: '', // Proposed next steps
+            N: '', // Name of Mine(s)
+            O: '', // Location (Country) of Mine(s)
+            P: '', // 100% recycled/scrap sources
+            Q: `Status: ${smelter.conformityStatus} | Reported by: ${Array.from(smelter.suppliers).join(', ')} | Verified on: ${new Date().toLocaleDateString('de-DE')}`
+          };
+
+          Object.entries(rowData).forEach(([col, value]) => {
+            if (value) {
+              const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col.charCodeAt(0) - 65 });
+              smelterSheet[cellRef] = { v: value, t: 's' };
+            }
+          });
+
+          currentRow++;
+        });
+
+        // Update sheet range
+        const newRange = `A1:Q${currentRow}`;
+        smelterSheet['!ref'] = newRange;
+      }
+
+      // Update Declaration sheet
+      if (workbook.Sheets['Declaration']) {
+        const declarationSheet = workbook.Sheets['Declaration'];
+        
+        // Update effective date (assuming it's in a specific cell)
+        const effectiveDateCells = ['C6', 'D6', 'E6', 'F6']; // Common locations for effective date
+        const currentDate = new Date().toLocaleDateString('de-DE');
+        
+        effectiveDateCells.forEach(cellRef => {
+          if (declarationSheet[cellRef] && 
+              declarationSheet[cellRef].v && 
+              declarationSheet[cellRef].v.toString().toLowerCase().includes('effective')) {
+            declarationSheet[cellRef] = { v: currentDate, t: 's' };
+          }
+        });
+
+        // Update description with consolidation info
+        const totalSuppliers = new Set(comparisonResults.map(r => r.supplierName)).size;
+        const descriptionText = `Consolidated from ${totalSuppliers} suppliers, checked on ${currentDate}`;
+        
+        // Try to find and update description field
+        const range = XLSX.utils.decode_range(declarationSheet['!ref'] || 'A1');
+        for (let row = 0; row <= range.e.r; row++) {
+          for (let col = 0; col <= range.e.c; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+            const cell = declarationSheet[cellRef];
+            if (cell && cell.v && 
+                typeof cell.v === 'string' && 
+                cell.v.toLowerCase().includes('description of scope')) {
+              // Update the cell below or next to it
+              const nextCellRef = XLSX.utils.encode_cell({ r: row, c: col + 1 });
+              const belowCellRef = XLSX.utils.encode_cell({ r: row + 1, c: col });
+              
+              if (declarationSheet[nextCellRef]) {
+                declarationSheet[nextCellRef] = { v: descriptionText, t: 's' };
+              } else if (declarationSheet[belowCellRef]) {
+                declarationSheet[belowCellRef] = { v: descriptionText, t: 's' };
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      const fileName = `${organizationTemplate.company_name || 'Organization'}_Consolidated_CMRT_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      toast({
+        title: "Vorlage erfolgreich ausgefüllt",
+        description: `Konsolidierte CMRT-Datei ${fileName} wurde heruntergeladen`,
+      });
+
+      setShowExportDialog(false);
+    } catch (error) {
+      console.error('Error exporting filled template:', error);
+      toast({
+        title: "Export-Fehler",
+        description: "Fehler beim Ausfüllen der Organisationsvorlage",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatDate = (dateString?: string) => {
@@ -872,10 +1085,56 @@ const Index = () => {
                 </CardHeader>
               </Card>
               <ComparisonResults results={comparisonResults} isProcessing={isComparing} summary={comparisonSummary} />
+              
+              {/* Export Results Button */}
+              <Card className="mt-4">
+                <CardContent className="pt-6">
+                  <Button onClick={handleExport} className="w-full">
+                    Export Results
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
       </div>
+
+      {/* Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export-Optionen</DialogTitle>
+            <DialogDescription>
+              Wählen Sie das Export-Format aus
+            </DialogDescription>
+          </DialogHeader>
+          
+          <RadioGroup value={exportOption} onValueChange={(value: 'raw' | 'template') => setExportOption(value)}>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="raw" id="raw" />
+                <Label htmlFor="raw">Export raw results</Label>
+              </div>
+              
+              {organizationTemplate && (
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="template" id="template" />
+                  <Label htmlFor="template">Export filled organization template</Label>
+                </div>
+              )}
+            </div>
+          </RadioGroup>
+          
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={exportOption === 'template' ? exportFilledTemplate : exportRawResults}>
+              Export
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

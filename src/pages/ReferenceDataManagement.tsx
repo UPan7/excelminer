@@ -29,13 +29,24 @@ interface ReferenceStats {
   last_updated: string;
 }
 
+interface OrganizationTemplate {
+  id: string;
+  template_name: string;
+  cmrt_version?: string;
+  company_name?: string;
+  uploaded_at: string;
+  is_active: boolean;
+}
+
 const ReferenceDataManagement = () => {
   const { user, loading: authLoading, signOut, userRole } = useAuth();
   const [referenceLists, setReferenceLists] = useState<ReferenceList[]>([]);
   const [stats, setStats] = useState<ReferenceStats[]>([]);
+  const [organizationTemplate, setOrganizationTemplate] = useState<OrganizationTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
+  const [isTemplateUploading, setIsTemplateUploading] = useState(false);
   const { toast } = useToast();
 
   // All hooks must be called before any conditional returns
@@ -80,8 +91,22 @@ const ReferenceDataManagement = () => {
 
       if (statsError) throw statsError;
 
+      // Load organization template
+      const { data: templateData, error: templateError } = await supabase
+        .from('organization_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('uploaded_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (templateError && templateError.code !== 'PGRST116') {
+        console.warn('Error loading template:', templateError);
+      }
+
       setReferenceLists((lists || []) as ReferenceList[]);
       setStats((statsData || []) as ReferenceStats[]);
+      setOrganizationTemplate(templateData as OrganizationTemplate || null);
     } catch (error) {
       console.error('Error loading reference data:', error);
       toast({
@@ -331,6 +356,106 @@ const ReferenceDataManagement = () => {
     }
   };
 
+  const handleTemplateUpload = async (file: File) => {
+    try {
+      setIsTemplateUploading(true);
+
+      // Parse the file to extract basic info
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      let companyName = '';
+      let cmrtVersion = '';
+      
+      // Try to extract company name from Declaration sheet
+      if (workbook.Sheets['Declaration']) {
+        try {
+          const declarationSheet = workbook.Sheets['Declaration'];
+          const declarationData = XLSX.utils.sheet_to_json(declarationSheet, { header: 1 });
+          
+          // Look for company name in D8 (or merged range D8:G8)
+          const companyNameRow = declarationData[7] as any[]; // Row 8 (0-indexed)
+          if (companyNameRow) {
+            // Check cells D8, E8, F8, G8 (columns 3, 4, 5, 6)
+            for (let col = 3; col <= 6; col++) {
+              if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && companyNameRow[col].trim()) {
+                companyName = companyNameRow[col].trim();
+                break;
+              }
+            }
+          }
+          
+          // Try to find CMRT version (look for version patterns)
+          const headerRows = declarationData.slice(0, 10);
+          for (const row of headerRows) {
+            if (Array.isArray(row)) {
+              for (const cell of row) {
+                if (cell && typeof cell === 'string' && cell.toLowerCase().includes('cmrt')) {
+                  const versionMatch = cell.match(/\d+\.\d+/);
+                  if (versionMatch) {
+                    cmrtVersion = versionMatch[0];
+                    break;
+                  }
+                }
+              }
+            }
+            if (cmrtVersion) break;
+          }
+        } catch (declarationError) {
+          console.warn('Could not extract info from Declaration sheet:', declarationError);
+        }
+      }
+
+      // Store the entire workbook structure
+      const fileData = {
+        sheets: {},
+        sheetNames: workbook.SheetNames
+      };
+
+      // Store all sheets
+      workbook.SheetNames.forEach(sheetName => {
+        fileData.sheets[sheetName] = workbook.Sheets[sheetName];
+      });
+
+      // Deactivate any existing templates
+      await supabase
+        .from('organization_templates')
+        .update({ is_active: false })
+        .eq('is_active', true);
+
+      // Insert new template
+      const { error: insertError } = await supabase
+        .from('organization_templates')
+        .insert({
+          template_name: file.name,
+          cmrt_version: cmrtVersion || null,
+          company_name: companyName || null,
+          file_data: fileData,
+          uploaded_by: user?.id
+        });
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Vorlage erfolgreich hochgeladen",
+        description: `${file.name} wurde als Organisationsvorlage gespeichert`,
+      });
+
+      // Reload data
+      await loadReferenceData();
+      
+    } catch (error) {
+      console.error('Template upload error:', error);
+      toast({
+        title: "Upload-Fehler",
+        description: error instanceof Error ? error.message : "Vorlage konnte nicht hochgeladen werden",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTemplateUploading(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('de-DE');
   };
@@ -498,6 +623,115 @@ const ReferenceDataManagement = () => {
             {renderReferenceSection('EMRT')}
             {renderReferenceSection('AMRT')}
           </div>
+
+          {/* Organization Template Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Unternehmensvorlage
+                  </CardTitle>
+                  <CardDescription>
+                    CMRT-Vorlage der Organisation für konsolidierten Export
+                  </CardDescription>
+                </div>
+                {organizationTemplate && (
+                  <Badge variant="default">
+                    Template aktiv
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-4">
+              {isTemplateUploading && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Vorlage wird hochgeladen...</span>
+                  </div>
+                  <Progress value={50} />
+                </div>
+              )}
+
+              {organizationTemplate ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Template loaded: {organizationTemplate.template_name}
+                  </div>
+                  
+                  {organizationTemplate.company_name && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">Unternehmen:</span>
+                      <span>{organizationTemplate.company_name}</span>
+                    </div>
+                  )}
+                  
+                  {organizationTemplate.cmrt_version && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">CMRT Version:</span>
+                      <span>{organizationTemplate.cmrt_version}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    Hochgeladen: {formatDate(organizationTemplate.uploaded_at)}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.xlsx,.xls';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) handleTemplateUpload(file);
+                        };
+                        input.click();
+                      }}
+                      disabled={isTemplateUploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Vorlage aktualisieren
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm">Keine Vorlage hochgeladen</span>
+                  </div>
+                  
+                  <Button
+                    variant="default"
+                    className="w-full"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.xlsx,.xls';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) handleTemplateUpload(file);
+                      };
+                      input.click();
+                    }}
+                    disabled={isTemplateUploading}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload PSM-CMRT Template
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
