@@ -21,7 +21,7 @@ export interface ComparisonResult {
   metal: string;
   country: string;
   smelterIdentificationNumber: string;
-  matchStatus: 'conformant' | 'non-conformant' | 'unknown' | 'pending-verification';
+  matchStatus: 'conformant' | 'active' | 'non-conformant' | 'attention-required' | 'unknown' | 'pending-verification';
   rmiAssessmentStatus?: string;
   confidenceScore?: number;
   matchedFacilityName?: string;
@@ -35,7 +35,9 @@ export interface ComparisonSummary {
   standardsUsed: string[];
   metalsChecked: string[];
   conformant: number;
+  active: number;
   nonConformant: number;
+  attentionRequired: number;
   unknown: number;
   pending: number;
   conformantPercentage: number;
@@ -76,36 +78,37 @@ export class ComparisonEngine {
       .trim();
   }
 
-  private isConformantStatus(status: string): boolean {
-    const conformantStatuses = [
-      'conformant',
-      'active',
-      'compliant',
-      'certified',
-      'approved',
-      'conform',
-      'valid',
-      'rmi' // Добавляем 'rmi' как валидный статус
-    ];
-    
-    const normalizedStatus = status.toLowerCase().trim();
-    console.log('Проверка статуса:', normalizedStatus);
-    
+  private getConformityStatus(status: string): 'conformant' | 'active' | 'non-conformant' | 'attention-required' {
     // Extract the actual status after the colon (remove standard prefix)
     let actualStatus = status;
     if (status.includes(':')) {
       actualStatus = status.split(':')[1].trim();
     }
     
-    // If status is empty after cleaning, but smelter was found in RMI list, consider it conformant
-    if (!actualStatus) {
-      console.log('Пустой статус, но плавильня найдена в RMI - считаем соответствующей');
-      return true;
+    const normalizedStatus = actualStatus.toLowerCase().trim();
+    
+    // Conformant = "Konform"
+    if (normalizedStatus.includes('conformant') || normalizedStatus.includes('conform')) {
+      return 'conformant';
     }
     
-    return conformantStatuses.some(conformantStatus => 
-      actualStatus.toLowerCase().includes(conformantStatus)
-    );
+    // Active = "Active" (in der Bewertung)
+    if (normalizedStatus.includes('active')) {
+      return 'active';
+    }
+    
+    // Non-Conformant = "Nicht konform"
+    if (normalizedStatus.includes('non-conformant') || normalizedStatus.includes('non conformant')) {
+      return 'non-conformant';
+    }
+    
+    // Alle anderen Status gelten als "erfordert Aufmerksamkeit"
+    return 'attention-required';
+  }
+
+  private isConformantStatus(status: string): boolean {
+    const conformityStatus = this.getConformityStatus(status);
+    return conformityStatus === 'conformant';
   }
 
   private findExactMatch(cmrtSmelter: CMRTData): { match: RMIData; standards: string[] } | null {
@@ -238,12 +241,9 @@ export class ComparisonEngine {
         result.matchedStandards = exactMatch.standards;
         result.sourceStandard = exactMatch.standards[0];
         
-        // Determine if conformant based on assessment status
-        if (this.isConformantStatus(exactMatch.match.assessmentStatus)) {
-          result.matchStatus = 'conformant';
-        } else {
-          result.matchStatus = 'non-conformant';
-        }
+        // Determine status based on assessment status
+        const conformityStatus = this.getConformityStatus(exactMatch.match.assessmentStatus);
+        result.matchStatus = conformityStatus;
       } else {
         // Try fuzzy match
         const fuzzyMatch = this.findFuzzyMatch(smelter);
@@ -261,11 +261,8 @@ export class ComparisonEngine {
           // For fuzzy matches, mark as pending verification if confidence is moderate
           if (fuzzyMatch.score >= 0.8) {
             // High confidence fuzzy match
-            if (this.isConformantStatus(fuzzyMatch.match.assessmentStatus)) {
-              result.matchStatus = 'conformant';
-            } else {
-              result.matchStatus = 'non-conformant';
-            }
+            const conformityStatus = this.getConformityStatus(fuzzyMatch.match.assessmentStatus);
+            result.matchStatus = conformityStatus;
           } else {
             // Moderate confidence - needs verification
             result.matchStatus = 'pending-verification';
@@ -285,7 +282,9 @@ export class ComparisonEngine {
   public getComparisonSummary(results: ComparisonResult[]): ComparisonSummary {
     const total = results.length;
     const conformant = results.filter(r => r.matchStatus === 'conformant').length;
+    const active = results.filter(r => r.matchStatus === 'active').length;
     const nonConformant = results.filter(r => r.matchStatus === 'non-conformant').length;
+    const attentionRequired = results.filter(r => r.matchStatus === 'attention-required').length;
     const unknown = results.filter(r => r.matchStatus === 'unknown').length;
     const pending = results.filter(r => r.matchStatus === 'pending-verification').length;
 
@@ -327,7 +326,9 @@ export class ComparisonEngine {
       standardsUsed: this.standardsUsed,
       metalsChecked: this.metalsChecked,
       conformant,
+      active,
       nonConformant,
+      attentionRequired,
       unknown,
       pending,
       conformantPercentage: total > 0 ? Math.round((conformant / total) * 100) : 0,
