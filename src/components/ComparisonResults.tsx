@@ -53,6 +53,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [metalFilter, setMetalFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
+  const [countryFilter, setCountryFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<keyof ComparisonResult>('smelterName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -86,6 +87,11 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     [results]
   );
 
+  const uniqueCountries = useMemo(() => 
+    [...new Set(results.map(r => r.country))].filter(Boolean).sort(),
+    [results]
+  );
+
   // Filter and sort results
   const filteredAndSortedResults = useMemo(() => {
     let filtered = results.filter(result => {
@@ -97,8 +103,9 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       const matchesStatus = statusFilter === 'all' || result.matchStatus === statusFilter;
       const matchesMetal = metalFilter === 'all' || result.metal === metalFilter;
       const matchesSupplier = supplierFilter === 'all' || result.supplierName === supplierFilter;
+      const matchesCountry = countryFilter === 'all' || result.country === countryFilter;
 
-      return matchesSearch && matchesStatus && matchesMetal && matchesSupplier;
+      return matchesSearch && matchesStatus && matchesMetal && matchesSupplier && matchesCountry;
     });
 
     // Sort results
@@ -120,7 +127,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     });
 
     return filtered;
-  }, [results, searchTerm, statusFilter, metalFilter, supplierFilter, sortField, sortDirection]);
+  }, [results, searchTerm, statusFilter, metalFilter, supplierFilter, countryFilter, sortField, sortDirection]);
 
   const getStatusIcon = (status: ComparisonResult['matchStatus']) => {
     switch (status) {
@@ -382,13 +389,29 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               </SelectContent>
             </Select>
 
-            <Button 
+            <Select value={countryFilter} onValueChange={setCountryFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Alle Länder" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">Alle Länder</SelectItem>
+                {uniqueCountries.map(country => (
+                  <SelectItem key={country} value={country}>{country}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Clear filters button row */}
+          <div className="mt-2">
+            <Button
               variant="outline" 
               onClick={() => {
                 setSearchTerm('');
                 setStatusFilter('all');
                 setMetalFilter('all');
                 setSupplierFilter('all');
+                setCountryFilter('all');
               }}
             >
               <Filter className="h-4 w-4 mr-2" />
