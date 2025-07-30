@@ -274,7 +274,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               Vergleichszusammenfassung
             </CardTitle>
             <CardDescription>
-              Geprüft: {summary.totalChecked} Schmelzen | 
+              Geprüft: {summary.totalChecked} Schmelzereien | 
               Standards: {summary.standardsUsed.join(', ')} | 
               Metalle: {summary.metalsChecked.join(', ')}
             </CardDescription>
@@ -344,7 +344,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Gesamte Schmelzen</CardTitle>
+            <CardTitle className="text-sm font-medium">Gesamte Schmelzereien</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -396,7 +396,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             <div>
               <CardTitle>Vergleichsergebnisse</CardTitle>
               <CardDescription>
-                {filteredAndSortedResults.length} von {results.length} Schmelzen
+                {filteredAndSortedResults.length} von {results.length} Schmelzereien
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -425,7 +425,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Schmelzen suchen..."
+                placeholder="Schmelzereien suchen..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
