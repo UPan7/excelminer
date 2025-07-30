@@ -600,24 +600,54 @@ const Index = () => {
                       </Button>
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {['Gold', 'Tin', 'Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal)).map(metal => (
-                      <div key={metal} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`metal-${metal}`}
-                          checked={settings.metals.includes(metal)}
-                          onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
-                        />
-                        <Label 
-                          htmlFor={`metal-${metal}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {metal}
-                        </Label>
+
+                  {/* Group metals by standards */}
+                  <div className="space-y-4">
+                    {/* CMRT Standards */}
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">CMRT Standards</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {['Gold', 'Tin'].filter(metal => availableMetals.includes(metal)).map(metal => (
+                          <div key={metal} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`metal-${metal}`}
+                              checked={settings.metals.includes(metal)}
+                              onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
+                            />
+                            <Label 
+                              htmlFor={`metal-${metal}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {metal}
+                            </Label>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+
+                    {/* EMRT Standards */}
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">EMRT Standards</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {['Cobalt', 'Copper', 'Nickel'].filter(metal => availableMetals.includes(metal)).map(metal => (
+                          <div key={metal} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`metal-${metal}`}
+                              checked={settings.metals.includes(metal)}
+                              onCheckedChange={(checked) => handleMetalChange(metal, checked === true)}
+                            />
+                            <Label 
+                              htmlFor={`metal-${metal}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {metal}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
+                  
                   {settings.metals.length === 0 && (
                     <p className="text-sm text-amber-600">
                       ⚠️ Wählen Sie mindestens ein Metall aus
