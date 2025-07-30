@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Download, ChevronDown, ChevronRight, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Search, Filter, Download, ChevronDown, ChevronRight, AlertCircle, CheckCircle, XCircle, Clock, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 
 export interface ComparisonResult {
@@ -50,9 +52,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
   summary
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [metalFilter, setMetalFilter] = useState<string>('all');
-  const [supplierFilter, setSupplierFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [metalFilter, setMetalFilter] = useState<string[]>([]);
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof ComparisonResult>('smelterName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -86,6 +89,11 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     [results]
   );
 
+  const uniqueCountries = useMemo(() => 
+    [...new Set(results.map(r => r.country))].filter(Boolean).sort(),
+    [results]
+  );
+
   // Filter and sort results
   const filteredAndSortedResults = useMemo(() => {
     let filtered = results.filter(result => {
@@ -94,11 +102,12 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
         result.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === 'all' || result.matchStatus === statusFilter;
-      const matchesMetal = metalFilter === 'all' || result.metal === metalFilter;
-      const matchesSupplier = supplierFilter === 'all' || result.supplierName === supplierFilter;
+      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(result.matchStatus);
+      const matchesMetal = metalFilter.length === 0 || metalFilter.includes(result.metal);
+      const matchesSupplier = supplierFilter.length === 0 || supplierFilter.includes(result.supplierName);
+      const matchesCountry = countryFilter.length === 0 || countryFilter.includes(result.country);
 
-      return matchesSearch && matchesStatus && matchesMetal && matchesSupplier;
+      return matchesSearch && matchesStatus && matchesMetal && matchesSupplier && matchesCountry;
     });
 
     // Sort results
@@ -120,7 +129,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     });
 
     return filtered;
-  }, [results, searchTerm, statusFilter, metalFilter, supplierFilter, sortField, sortDirection]);
+  }, [results, searchTerm, statusFilter, metalFilter, supplierFilter, countryFilter, sortField, sortDirection]);
 
   const getStatusIcon = (status: ComparisonResult['matchStatus']) => {
     switch (status) {
@@ -146,6 +155,69 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       case 'pending-verification':
         return <Badge className="bg-yellow-600 hover:bg-yellow-700">Überprüfung</Badge>;
     }
+  };
+
+  // Multi-select component
+  const MultiSelect = ({ 
+    options, 
+    value, 
+    onChange, 
+    placeholder 
+  }: { 
+    options: string[]; 
+    value: string[]; 
+    onChange: (value: string[]) => void; 
+    placeholder: string;
+  }) => {
+    const [open, setOpen] = useState(false);
+
+    const handleToggle = (option: string, event: React.MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const newValue = value.includes(option)
+        ? value.filter(v => v !== option)
+        : [...value, option];
+      onChange(newValue);
+    };
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="justify-between w-full"
+            onClick={() => setOpen(!open)}
+          >
+            <span className="truncate">
+              {value.length === 0 
+                ? placeholder 
+                : value.length === 1 
+                  ? value[0] 
+                  : `${value.length} ausgewählt`
+              }
+            </span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0 bg-background z-50" align="start">
+          <div className="max-h-64 overflow-auto">
+            {options.map((option) => (
+              <div
+                key={option}
+                className="flex items-center space-x-2 px-4 py-2 hover:bg-muted cursor-pointer"
+                onClick={(e) => handleToggle(option, e)}
+              >
+                <Checkbox
+                  checked={value.includes(option)}
+                  onChange={() => {}} // Handled by parent onClick
+                />
+                <span className="text-sm">{option}</span>
+              </div>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   };
 
   const toggleRowExpansion = (id: string) => {
@@ -202,7 +274,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               Vergleichszusammenfassung
             </CardTitle>
             <CardDescription>
-              Geprüft: {summary.totalChecked} Schmelzereien | 
+              Geprüft: {summary.totalChecked} Schmelzen | 
               Standards: {summary.standardsUsed.join(', ')} | 
               Metalle: {summary.metalsChecked.join(', ')}
             </CardDescription>
@@ -272,7 +344,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Gesamte Schmelzereien</CardTitle>
+            <CardTitle className="text-sm font-medium">Gesamte Schmelzen</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -324,77 +396,71 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             <div>
               <CardTitle>Vergleichsergebnisse</CardTitle>
               <CardDescription>
-                {filteredAndSortedResults.length} von {results.length} Schmelzereien
+                {filteredAndSortedResults.length} von {results.length} Schmelzen
               </CardDescription>
             </div>
-            <Button onClick={exportToExcel} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Excel exportieren
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter([]);
+                  setMetalFilter([]);
+                  setSupplierFilter([]);
+                  setCountryFilter([]);
+                }}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Löschen
+              </Button>
+              <Button onClick={exportToExcel} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Excel exportieren
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+          <div className="grid grid-cols-5 gap-4 mt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Schmelzereien suchen..."
+                placeholder="Schmelzen suchen..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Status</SelectItem>
-                <SelectItem value="conformant">Konform</SelectItem>
-                <SelectItem value="non-conformant">Nicht-konform</SelectItem>
-                <SelectItem value="unknown">Unbekannt</SelectItem>
-                <SelectItem value="pending-verification">Überprüfung</SelectItem>
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={['conformant', 'non-conformant', 'unknown', 'pending-verification']}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="Alle Status"
+            />
 
-            <Select value={metalFilter} onValueChange={setMetalFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Metalle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Metalle</SelectItem>
-                {uniqueMetals.map(metal => (
-                  <SelectItem key={metal} value={metal}>{metal}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={uniqueMetals}
+              value={metalFilter}
+              onChange={setMetalFilter}
+              placeholder="Alle Metalle"
+            />
 
-            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Alle Lieferanten" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Lieferanten</SelectItem>
-                {uniqueSuppliers.map(supplier => (
-                  <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={uniqueSuppliers}
+              value={supplierFilter}
+              onChange={setSupplierFilter}
+              placeholder="Alle Lieferanten"
+            />
 
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-                setMetalFilter('all');
-                setSupplierFilter('all');
-              }}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Löschen
-            </Button>
+            <MultiSelect
+              options={uniqueCountries}
+              value={countryFilter}
+              onChange={setCountryFilter}
+              placeholder="Alle Länder"
+            />
           </div>
+
         </CardHeader>
 
         <CardContent>
@@ -410,10 +476,10 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                     Lieferant
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 w-32"
                     onClick={() => handleSort('smelterName')}
                   >
-                    Schmelzname
+                    Schmelzereiname
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
@@ -421,23 +487,28 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                   >
                     Metall
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('country')}
-                  >
-                    Land
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('matchStatus')}
-                  >
-                    Status
-                  </TableHead>
-                  <TableHead>Vertrauen</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAndSortedResults.map((result) => (
+                   <TableHead 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => handleSort('country')}
+                   >
+                     Land
+                   </TableHead>
+                   <TableHead 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => handleSort('smelterIdentificationNumber')}
+                   >
+                     Smelzerei-ID
+                   </TableHead>
+                   <TableHead 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => handleSort('matchStatus')}
+                   >
+                     Status
+                   </TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {filteredAndSortedResults.map((result) => (
                   <React.Fragment key={result.id}>
                     <TableRow className="hover:bg-muted/50">
                       <TableCell>
@@ -457,23 +528,17 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                           </CollapsibleTrigger>
                         </Collapsible>
                       </TableCell>
-                      <TableCell className="font-medium">{result.supplierName}</TableCell>
-                      <TableCell>{result.smelterName}</TableCell>
-                      <TableCell>{result.metal}</TableCell>
-                      <TableCell>{result.country}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(result.matchStatus)}
-                          {getStatusBadge(result.matchStatus)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {result.confidenceScore && (
-                          <span className="text-sm">
-                            {Math.round(result.confidenceScore * 100)}%
-                          </span>
-                        )}
-                      </TableCell>
+                       <TableCell className="font-medium">{result.supplierName}</TableCell>
+                       <TableCell>{result.smelterName}</TableCell>
+                       <TableCell>{result.metal}</TableCell>
+                       <TableCell>{result.country}</TableCell>
+                       <TableCell>{result.smelterIdentificationNumber || 'N/A'}</TableCell>
+                       <TableCell>
+                         <div className="flex items-center gap-2">
+                           {getStatusIcon(result.matchStatus)}
+                           {getStatusBadge(result.matchStatus)}
+                         </div>
+                       </TableCell>
                     </TableRow>
                     {expandedRows.has(result.id) && (
                       <TableRow>

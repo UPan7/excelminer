@@ -241,7 +241,7 @@ const Index = () => {
 
       toast({
         title: "Lieferantendatei erfolgreich verarbeitet",
-        description: `${file.name} wurde geparst: ${supplierData.length} Schmelzen gefunden.`,
+        description: `${file.name} wurde geparst: ${supplierData.length} Schmelzereien gefunden.`,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
@@ -372,7 +372,7 @@ const Index = () => {
 
       toast({
         title: "Vergleich abgeschlossen",
-        description: `${allResults.length} Schmelzen geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
+        description: `${allResults.length} Schmelzereien geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
       });
 
     } catch (error) {
@@ -481,7 +481,7 @@ const Index = () => {
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-4">ExcelMiner</h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Professionelles Tool zum Vergleich von Lieferanten-Schmelzen mit Referenzdaten.
+              Professionelles Tool zum Vergleich von Lieferanten-Schmelzereien mit Referenzdaten.
               Wählen Sie Standards und Metalle aus und laden Sie Ihre Lieferantendateien hoch.
             </p>
           </div>
@@ -729,7 +729,7 @@ const Index = () => {
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Dateien abgleichen
+                        Dateien vergleichen
                       </>
                     )}
                   </Button>
@@ -776,7 +776,7 @@ const Index = () => {
                           <p className="font-medium">{file.name}</p>
                           <p className="text-sm text-muted-foreground">
                             {(file.size / 1024 / 1024).toFixed(2)} MB
-                            {file.data && ` • ${file.data.length} Schmelzen gefunden`}
+                            {file.data && ` • ${file.data.length} Schmelzereien gefunden`}
                           </p>
                           {file.error && (
                             <p className="text-sm text-destructive mt-1">{file.error}</p>
@@ -807,7 +807,7 @@ const Index = () => {
                 <CardHeader>
                   <CardTitle>Vergleichsergebnis</CardTitle>
                   <CardDescription>
-                    Geprüft: {comparisonResults.length} Schmelzen | 
+                    Geprüft: {comparisonResults.length} Schmelzereien | 
                     Standards: {settings.standards.join(', ')} | 
                     Metalle: {settings.metals.join(', ')}
                   </CardDescription>
