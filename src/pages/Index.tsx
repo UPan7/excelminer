@@ -865,16 +865,6 @@ const Index = () => {
           {/* Results */}
           {comparisonResults.length > 0 && (
             <div className="mb-8">
-              <Card className="mb-4">
-                <CardHeader>
-                  <CardTitle>Abgleichergebnis</CardTitle>
-                  <CardDescription>
-                    Geprüft: {comparisonResults.length} Schmelzereien | 
-                    Standards: {settings.standards.join(', ')} | 
-                    Metalle: {settings.metals.join(', ')}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
               <ComparisonResults results={comparisonResults} isProcessing={isComparing} summary={comparisonSummary} />
             </div>
           )}
