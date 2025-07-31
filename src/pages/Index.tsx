@@ -63,6 +63,14 @@ const Index = () => {
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | undefined>(undefined);
   const { toast } = useToast();
 
+  // All hooks must be before any conditional returns
+  useEffect(() => {
+    // Only load database status if user is authenticated
+    if (user && session) {
+      loadDatabaseStatus();
+    }
+  }, [user, session]);
+
   // Show loading while auth state is being determined
   if (loading) {
     return (
@@ -79,10 +87,6 @@ const Index = () => {
   if (!user || !session) {
     return <AuthPage onAuthSuccess={() => window.location.reload()} />;
   }
-
-  useEffect(() => {
-    loadDatabaseStatus();
-  }, []);
 
   const loadDatabaseStatus = async () => {
     try {
