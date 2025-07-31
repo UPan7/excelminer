@@ -28,6 +28,7 @@ export interface ComparisonResult {
   countryLocation?: string;
   stateProvinceRegion?: string;
   city?: string;
+  smelterReference?: string;
 }
 
 export interface ComparisonSummary {
@@ -558,7 +559,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                      className="cursor-pointer hover:bg-muted/50"
                      onClick={() => handleSort('smelterIdentificationNumber')}
                    >
-                     Smelzerei-ID
+                     Schmelzerei-ID
                    </TableHead>
                    <TableHead 
                      className="cursor-pointer hover:bg-muted/50"
@@ -604,31 +605,24 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                     {expandedRows.has(result.id) && (
                       <TableRow>
                         <TableCell colSpan={7} className="bg-muted/25">
-                          <div className="p-4 space-y-2">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="font-medium">Schmelz-ID:</span> {result.smelterIdentificationNumber || 'N/A'}
-                              </div>
-                              <div>
-                                <span className="font-medium">RMI-Bewertung:</span> {result.rmiAssessmentStatus || 'N/A'}
-                              </div>
-                              {result.matchedFacilityName && (
-                                <div>
-                                  <span className="font-medium">Gefundene Einrichtung:</span> {result.matchedFacilityName}
-                                </div>
-                              )}
-                              {result.matchedFacilityId && (
-                                <div>
-                                  <span className="font-medium">Gefundene Einrichtungs-ID:</span> {result.matchedFacilityId}
-                                </div>
-                              )}
-                              {result.matchedStandards && result.matchedStandards.length > 0 && (
-                                <div>
-                                  <span className="font-medium">Gefunden in Standards:</span> {result.matchedStandards.join(', ')}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                           <div className="p-4 space-y-2">
+                             <div className="grid grid-cols-2 gap-4 text-sm">
+                               <div>
+                                 <span className="font-medium">Schmelzerei-Referenz:</span> {result.smelterReference || 'N/A'}
+                               </div>
+                               <div>
+                                 <span className="font-medium">Stadt:</span> {result.city || 'N/A'}
+                               </div>
+                               <div>
+                                 <span className="font-medium">Region:</span> {result.stateProvinceRegion || 'N/A'}
+                               </div>
+                               {result.matchedStandards && result.matchedStandards.length > 0 && (
+                                 <div>
+                                   <span className="font-medium">Gefunden in Standards:</span> {result.matchedStandards.join(', ')}
+                                 </div>
+                               )}
+                             </div>
+                           </div>
                         </TableCell>
                       </TableRow>
                     )}
