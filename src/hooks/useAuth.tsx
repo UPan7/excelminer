@@ -76,8 +76,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    // Set up session timeout (8 hours)
+    const sessionTimeout = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimeout = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        signOut();
+      }, sessionTimeout);
+    };
+
+    // Start timeout if user is authenticated
+    if (session?.user) {
+      resetTimeout();
+    }
+
+    // Reset timeout on user activity
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const resetTimeoutOnActivity = () => {
+      if (session?.user) resetTimeout();
+    };
+
+    activityEvents.forEach(event => {
+      document.addEventListener(event, resetTimeoutOnActivity, true);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, resetTimeoutOnActivity, true);
+      });
+    };
+  }, [session]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
