@@ -499,29 +499,6 @@ const ReferenceDataManagement = () => {
             {renderReferenceSection('AMRT')}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Gesamtstatistik</CardTitle>
-              <CardDescription>
-                Zusammenfassende Informationen zu allen Referenzlisten
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {stats.map(stat => (
-                  <div key={stat.list_type} className="text-center space-y-2">
-                    <h3 className="font-semibold">{stat.list_type}</h3>
-                    <p className="text-2xl font-bold text-primary">
-                      {stat.total_facilities.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {stat.last_updated ? `Aktualisiert: ${formatDate(stat.last_updated)}` : 'Nicht geladen'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </>
