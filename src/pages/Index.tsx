@@ -700,9 +700,9 @@ const Index = () => {
                   Laden Sie Ihre CMRT/EMRT/AMRT Lieferantendateien hoch (Excel/CSV)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div
-                  className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                     isDragOver
                       ? 'border-primary bg-primary/10'
                       : 'border-muted-foreground/25 hover:border-primary'
@@ -711,11 +711,11 @@ const Index = () => {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                 >
-                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold mb-1">
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">
                     Dateien hierher ziehen oder klicken zum Auswählen
                   </h3>
-                  <p className="text-xs text-muted-foreground mb-3">
+                  <p className="text-muted-foreground mb-4">
                     Unterstützte Formate: Excel (.xlsx, .xls), CSV (.csv)
                   </p>
                   <input
@@ -726,56 +726,12 @@ const Index = () => {
                     className="hidden"
                     id="file-upload"
                   />
-                  <Button asChild size="sm">
+                  <Button asChild>
                     <label htmlFor="file-upload" className="cursor-pointer">
                       Dateien auswählen
                     </label>
                   </Button>
                 </div>
-
-                {/* Uploaded Files Display */}
-                {supplierFiles.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5" />
-                      <span className="font-medium">Hochgeladene Dateien</span>
-                      <Badge variant="secondary">{supplierFiles.length}</Badge>
-                    </div>
-                    {supplierFiles.map((file) => (
-                      <div 
-                        key={file.id} 
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          {getStatusIcon(file.status)}
-                          <div>
-                            <p className="font-medium">{file.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                              {file.data && ` • ${file.data.length} Schmelzereien gefunden`}
-                              {file.supplierName && file.supplierName !== file.name.replace(/\.(xlsx|xls|csv)$/i, '') && (
-                                <span className="block">Lieferant: {file.supplierName}</span>
-                              )}
-                            </p>
-                            {file.error && (
-                              <p className="text-sm text-destructive mt-1">{file.error}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(file.status)}
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => removeFile(file.id)}
-                          >
-                            Entfernen
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -857,9 +813,70 @@ const Index = () => {
             </Card>
           </div>
 
+          {/* Uploaded Files List */}
+          {supplierFiles.length > 0 && (
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Hochgeladene Lieferantendateien</CardTitle>
+                <CardDescription>
+                  Verwalten Sie Ihre hochgeladenen Dateien
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {supplierFiles.map((file) => (
+                    <div 
+                      key={file.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(file.status)}
+                        <div>
+                          <p className="font-medium">{file.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                            {file.data && ` • ${file.data.length} Schmelzereien gefunden`}
+                            {file.supplierName && file.supplierName !== file.name.replace(/\.(xlsx|xls|csv)$/i, '') && (
+                              <span className="block">Lieferant: {file.supplierName}</span>
+                            )}
+                          </p>
+                          {file.error && (
+                            <p className="text-sm text-destructive mt-1">{file.error}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(file.status)}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => removeFile(file.id)}
+                        >
+                          Entfernen
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Results */}
           {comparisonResults.length > 0 && (
-            <ComparisonResults results={comparisonResults} isProcessing={isComparing} summary={comparisonSummary} />
+            <div className="mb-8">
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle>Abgleichergebnis</CardTitle>
+                  <CardDescription>
+                    Geprüft: {comparisonResults.length} Schmelzereien | 
+                    Standards: {settings.standards.join(', ')} | 
+                    Metalle: {settings.metals.join(', ')}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              <ComparisonResults results={comparisonResults} isProcessing={isComparing} summary={comparisonSummary} />
+            </div>
           )}
         </div>
       </div>
