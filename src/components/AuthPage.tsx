@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Shield } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 interface AuthPageProps {
   onAuthSuccess?: (user: User, session: Session) => void;
@@ -104,7 +104,11 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Shield className="h-12 w-12 text-primary" />
+            <img 
+              src="/lovable-uploads/6c3710d1-89e1-436a-b297-049f3819fdf5.png" 
+              alt="Protech Logo" 
+              className="h-12 w-auto"
+            />
           </div>
           <CardTitle className="text-2xl font-bold">ExcelMiner</CardTitle>
           <CardDescription>
