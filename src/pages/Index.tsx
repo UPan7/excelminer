@@ -702,7 +702,7 @@ const Index = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
                     isDragOver
                       ? 'border-primary bg-primary/10'
                       : 'border-muted-foreground/25 hover:border-primary'
@@ -711,11 +711,11 @@ const Index = () => {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                 >
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold mb-1">
                     Dateien hierher ziehen oder klicken zum Auswählen
                   </h3>
-                  <p className="text-muted-foreground mb-4">
+                  <p className="text-xs text-muted-foreground mb-3">
                     Unterstützte Formate: Excel (.xlsx, .xls), CSV (.csv)
                   </p>
                   <input
@@ -726,7 +726,7 @@ const Index = () => {
                     className="hidden"
                     id="file-upload"
                   />
-                  <Button asChild>
+                  <Button asChild size="sm">
                     <label htmlFor="file-upload" className="cursor-pointer">
                       Dateien auswählen
                     </label>
