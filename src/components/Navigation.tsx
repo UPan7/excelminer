@@ -32,7 +32,11 @@ const Navigation: React.FC<NavigationProps> = ({ referenceDataStatus }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1">
             <div className="mr-6">
-              <h1 className="text-2xl font-bold text-primary">ExcelMiner</h1>
+              <img 
+                src="/lovable-uploads/6c3710d1-89e1-436a-b297-049f3819fdf5.png" 
+                alt="Protech Logo" 
+                className="h-8 w-auto"
+              />
             </div>
             
             <Link to="/">

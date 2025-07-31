@@ -473,7 +473,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                 <Filter className="h-4 w-4 mr-2" />
                 Löschen
               </Button>
-              <Button onClick={exportToExcel} variant="outline">
+              <Button onClick={exportToExcel} variant="default">
                 <Download className="h-4 w-4 mr-2" />
                 Excel exportieren
               </Button>
