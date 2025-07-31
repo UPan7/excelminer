@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Shield } from "lucide-react";
 
@@ -21,6 +21,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     password: "",
   });
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Check if user is already logged in
@@ -49,7 +50,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
       // Get return URL from sessionStorage or default to home
       const returnUrl = sessionStorage.getItem('returnUrl') || '/';
       sessionStorage.removeItem('returnUrl');
-      window.location.href = returnUrl;
+      navigate(returnUrl, { replace: true });
     }
   };
 

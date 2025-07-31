@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 
 interface ReferenceList {
@@ -30,7 +29,7 @@ interface ReferenceStats {
 }
 
 const ReferenceDataManagement = () => {
-  const { user, loading: authLoading, signOut, userRole } = useAuth();
+  const { userRole } = useAuth();
   const [referenceLists, setReferenceLists] = useState<ReferenceList[]>([]);
   const [stats, setStats] = useState<ReferenceStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,29 +37,9 @@ const ReferenceDataManagement = () => {
   const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
-  // All hooks must be called before any conditional returns
   useEffect(() => {
-    if (user) {
-      loadReferenceData();
-    }
-  }, [user]);
-
-  // Redirect to auth if not authenticated
-  if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  // Show loading while auth state is being determined
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Autorisierung prüfen...</p>
-        </div>
-      </div>
-    );
-  }
+    loadReferenceData();
+  }, []);
 
   const loadReferenceData = async () => {
     try {
