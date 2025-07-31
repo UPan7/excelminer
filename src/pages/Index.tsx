@@ -536,28 +536,42 @@ const Index = () => {
     if (!organizationTemplate || comparisonResults.length === 0) return;
 
     try {
-      // Check if template has binary data (new format) or fall back to old format
-      if (!organizationTemplate.file_data.binaryData) {
+      let workbook = new ExcelJS.Workbook();
+
+      // Handle both new format (with binaryData) and old format (with sheets)
+      if (organizationTemplate.file_data.binaryData) {
+        // New format: Load from binary data
+        const templateBinaryData = organizationTemplate.file_data.binaryData;
+        await workbook.xlsx.load(Buffer.from(templateBinaryData, 'base64'));
+      } else if (organizationTemplate.file_data.sheets) {
+        // Old format: Recreate workbook from sheets data
+        console.log('Using old template format, recreating workbook from sheets data');
+        
+        // Create workbook from old format sheets data
+        const xlsxWorkbook = XLSX.utils.book_new();
+        
+        Object.entries(organizationTemplate.file_data.sheets).forEach(([sheetName, sheetData]: [string, any]) => {
+          const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+          XLSX.utils.book_append_sheet(xlsxWorkbook, worksheet, sheetName);
+        });
+        
+        // Convert XLSX workbook to buffer and then load into ExcelJS
+        const xlsxBuffer = XLSX.write(xlsxWorkbook, { type: 'buffer', bookType: 'xlsx' });
+        await workbook.xlsx.load(xlsxBuffer);
+      } else {
         toast({
           title: "Template-Format nicht unterstützt",
-          description: "Bitte laden Sie die Organisationsvorlage erneut hoch, um die neue Export-Funktion zu nutzen.",
+          description: "Die Organisationsvorlage hat ein unbekanntes Format. Bitte laden Sie sie erneut hoch.",
           variant: "destructive",
         });
         setShowExportDialog(false);
         return;
       }
 
-      // Get the template file data stored as binary
-      const templateBinaryData = organizationTemplate.file_data.binaryData;
-      
-      // Create a new ExcelJS workbook from the template buffer
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(Buffer.from(templateBinaryData, 'base64'));
-
       // Get unique smelters with consolidated information
       const uniqueSmelters = new Map();
       comparisonResults.forEach(result => {
-        const key = `${result.smelterName}_${result.metal}`;
+        const key = `${result.smelterName}_${result.metal}_${result.country}`;
         if (!uniqueSmelters.has(key)) {
           uniqueSmelters.set(key, {
             smelterName: result.smelterName,
@@ -566,11 +580,17 @@ const Index = () => {
             smelterId: result.smelterIdentificationNumber || '',
             conformityStatus: result.matchStatus,
             suppliers: new Set([result.supplierName]),
-            rmiName: result.matchedFacilityName || result.smelterName
+            rmiName: result.matchedFacilityName || result.smelterName,
+            rmiAssessmentStatus: result.rmiAssessmentStatus || ''
           });
         } else {
           const existing = uniqueSmelters.get(key);
           existing.suppliers.add(result.supplierName);
+          // Update status if we find a better status (prioritize conformant/active)
+          if ((result.matchStatus === 'conformant' || result.matchStatus === 'active') && 
+              (existing.conformityStatus === 'non-conformant' || existing.conformityStatus === 'attention-required')) {
+            existing.conformityStatus = result.matchStatus;
+          }
         }
       });
 
@@ -593,15 +613,28 @@ const Index = () => {
           const row = smelterWorksheet.getRow(currentRow);
           
           // Fill columns according to CMRT template structure
-          row.getCell(1).value = smelter.smelterId; // Column A: Same as column F
+          row.getCell(1).value = smelter.smelterId; // Column A: Duplicate of Column F (Smelter ID)
           row.getCell(2).value = smelter.metal; // Column B: Metal (*)
-          row.getCell(3).value = smelter.rmiName; // Column C: Smelter Look-up (*)
+          row.getCell(3).value = smelter.rmiName; // Column C: Smelter Look-up (*) - Keep RMI name for dropdown validation
           row.getCell(4).value = smelter.smelterName; // Column D: Smelter Name (1)
           row.getCell(5).value = smelter.country; // Column E: Smelter Country (*)
           row.getCell(6).value = smelter.smelterId; // Column F: Smelter Identification
           row.getCell(7).value = smelter.smelterId ? 'RMI' : ''; // Column G: Source
-          // Columns H-P are left empty as per instructions
-          row.getCell(17).value = `Status: ${smelter.conformityStatus}\nReported by: ${Array.from(smelter.suppliers).join(', ')}\nVerified on: ${new Date().toLocaleDateString('de-DE')}`; // Column Q: Comments
+          // Columns H-P (8-16): Leave empty as per requirements
+          for (let col = 8; col <= 16; col++) {
+            row.getCell(col).value = '';
+          }
+          
+          // Column Q: Status, suppliers, and verification date according to German translation
+          const statusTranslation = {
+            'conformant': 'Konform',
+            'active': 'Aktiv', 
+            'non-conformant': 'Nicht konform',
+            'attention-required': 'Erfordert Aufmerksamkeit'
+          };
+          const translatedStatus = statusTranslation[smelter.conformityStatus as keyof typeof statusTranslation] || smelter.conformityStatus;
+          
+          row.getCell(17).value = `Status: ${translatedStatus}\nLieferanten: ${Array.from(smelter.suppliers).join(', ')}\nPrüfdatum: ${new Date().toLocaleDateString('de-DE')}`; // Column Q: Comments
           
           currentRow++;
         });
