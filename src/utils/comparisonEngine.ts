@@ -12,6 +12,9 @@ export interface RMIData {
   standardFacilityName: string;
   metal: string;
   assessmentStatus: string;
+  countryLocation?: string;
+  stateProvinceRegion?: string;
+  city?: string;
 }
 
 export interface ComparisonResult {
@@ -28,6 +31,9 @@ export interface ComparisonResult {
   matchedFacilityId?: string;
   matchedStandards?: string[]; // Which standards this smelter was found in
   sourceStandard?: string; // Primary standard where match was found
+  countryLocation?: string;
+  stateProvinceRegion?: string;
+  city?: string;
 }
 
 export interface ComparisonSummary {
@@ -238,6 +244,9 @@ export class ComparisonEngine {
         result.confidenceScore = 1.0;
         result.matchedStandards = exactMatch.standards;
         result.sourceStandard = exactMatch.standards[0];
+        result.countryLocation = exactMatch.match.countryLocation;
+        result.stateProvinceRegion = exactMatch.match.stateProvinceRegion;
+        result.city = exactMatch.match.city;
         
         // Determine status based on assessment status
         const conformityStatus = this.getConformityStatus(exactMatch.match.assessmentStatus);
@@ -255,6 +264,9 @@ export class ComparisonEngine {
           result.confidenceScore = fuzzyMatch.score;
           result.matchedStandards = fuzzyMatch.standards;
           result.sourceStandard = fuzzyMatch.standards[0];
+          result.countryLocation = fuzzyMatch.match.countryLocation;
+          result.stateProvinceRegion = fuzzyMatch.match.stateProvinceRegion;
+          result.city = fuzzyMatch.match.city;
           
           // For fuzzy matches with high confidence
           if (fuzzyMatch.score >= 0.8) {

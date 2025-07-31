@@ -44,6 +44,7 @@ export type Database = {
       reference_facilities: {
         Row: {
           assessment_status: string | null
+          city: string | null
           country_location: string | null
           created_at: string
           dd_assessment_cycle: string | null
@@ -63,6 +64,7 @@ export type Database = {
         }
         Insert: {
           assessment_status?: string | null
+          city?: string | null
           country_location?: string | null
           created_at?: string
           dd_assessment_cycle?: string | null
@@ -82,6 +84,7 @@ export type Database = {
         }
         Update: {
           assessment_status?: string | null
+          city?: string | null
           country_location?: string | null
           created_at?: string
           dd_assessment_cycle?: string | null

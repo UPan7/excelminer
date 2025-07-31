@@ -25,6 +25,9 @@ export interface ComparisonResult {
   matchedFacilityId?: string;
   matchedStandards?: string[];
   sourceStandard?: string;
+  countryLocation?: string;
+  stateProvinceRegion?: string;
+  city?: string;
 }
 
 export interface ComparisonSummary {
@@ -262,24 +265,58 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     }
   };
 
+  const translateStatus = (status: string) => {
+    const translations: { [key: string]: string } = {
+      'conformant': 'Konform',
+      'active': 'Aktiv', 
+      'non-conformant': 'Nicht Konform',
+      'attention-required': 'Erfordert Aufmerksamkeit'
+    };
+    return translations[status] || status;
+  };
+
   const exportToExcel = () => {
-    const exportData = filteredAndSortedResults.map(result => ({
-      'Supplier': result.supplierName,
-      'Smelter Name': result.smelterName,
-      'Metal': result.metal,
-      'Country': result.country,
-      'Smelter ID': result.smelterIdentificationNumber,
-      'Match Status': result.matchStatus,
-      'RMI Assessment Status': result.rmiAssessmentStatus || '',
-      'Confidence Score': result.confidenceScore || '',
-      'Matched Facility Name': result.matchedFacilityName || '',
-      'Matched Facility ID': result.matchedFacilityId || ''
+    // Deduplicate by smelter ID - keep first occurrence
+    const uniqueSmelters = filteredAndSortedResults.reduce((acc, result) => {
+      const key = result.smelterIdentificationNumber || `${result.smelterName}-${result.metal}`;
+      if (!acc.has(key)) {
+        acc.set(key, result);
+      }
+      return acc;
+    }, new Map<string, ComparisonResult>());
+
+    // Convert to array and sort by Metal, then Smelter Name
+    const sortedUniqueResults = Array.from(uniqueSmelters.values()).sort((a, b) => {
+      const metalComparison = (a.metal || '').localeCompare(b.metal || '');
+      if (metalComparison !== 0) return metalComparison;
+      return (a.smelterName || '').localeCompare(b.smelterName || '');
+    });
+
+    // Create the 17-column CMRT export structure
+    const exportData = sortedUniqueResults.map(result => ({
+      'Smelter Identification Number Input Column': result.smelterIdentificationNumber || '',
+      'Metal (*)': result.metal || '',
+      'Smelter Look-up (*)': result.smelterName || '',
+      'Smelter Name (1)': result.smelterName || '',
+      'Smelter Country (*)': result.countryLocation || result.country || '',
+      'Smelter Identification': result.smelterIdentificationNumber || '',
+      'Source of Smelter Identification Number': 'RMI',
+      'Smelter Street': '',
+      'Smelter City': result.city || '',
+      'Smelter Facility Location: State / Province': result.stateProvinceRegion || '',
+      'Smelter Contact Name': '',
+      'Smelter Contact Email': '',
+      'Proposed next steps': '',
+      'Name of Mine(s) or if recycled or scrap sourced, enter "recycled" or "scrap"': '',
+      'Location (Country) of Mine(s) or if recycled or scrap sourced, enter "recycled" or "scrap"': '',
+      'Does 100% of the smelter\'s feedstock originate from recycled or scrap sources?': '',
+      'Comments': `Status: ${translateStatus(result.matchStatus)}`
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Compliance Results');
-    XLSX.writeFile(wb, `compliance-results-${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Smelter List');
+    XLSX.writeFile(wb, `ExcelMiner_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   if (results.length === 0 && !isProcessing) {
