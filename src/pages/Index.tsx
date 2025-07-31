@@ -12,6 +12,8 @@ import { ComparisonResults, type ComparisonResult, type ComparisonSummary } from
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import AuthPage from '@/components/AuthPage';
 
 interface SupplierFileData {
   id: string;
@@ -43,6 +45,7 @@ interface DatabaseStatus {
 const AVAILABLE_STANDARDS = ['CMRT', 'EMRT', 'AMRT'];
 
 const Index = () => {
+  const { user, session, loading } = useAuth();
   const [supplierFiles, setSupplierFiles] = useState<SupplierFileData[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([]);
@@ -59,6 +62,23 @@ const Index = () => {
   const [availableMetals, setAvailableMetals] = useState<string[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | undefined>(undefined);
   const { toast } = useToast();
+
+  // Show loading while auth state is being determined
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Laden...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth page if not authenticated
+  if (!user || !session) {
+    return <AuthPage onAuthSuccess={() => window.location.reload()} />;
+  }
 
   useEffect(() => {
     loadDatabaseStatus();
