@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertTriangle, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import ExcelJS from 'exceljs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,8 +12,6 @@ import { ComparisonResults, type ComparisonResult, type ComparisonSummary } from
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface SupplierFileData {
   id: string;
@@ -61,35 +58,11 @@ const Index = () => {
   });
   const [availableMetals, setAvailableMetals] = useState<string[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | undefined>(undefined);
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [exportOption, setExportOption] = useState<'raw' | 'template'>('raw');
-  const [organizationTemplate, setOrganizationTemplate] = useState<any | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     loadDatabaseStatus();
-    loadOrganizationTemplate();
   }, []);
-
-  const loadOrganizationTemplate = async () => {
-    try {
-      const { data: templateData, error: templateError } = await supabase
-        .from('organization_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('uploaded_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (templateError && templateError.code !== 'PGRST116') {
-        console.warn('Error loading template:', templateError);
-      }
-
-      setOrganizationTemplate(templateData || null);
-    } catch (error) {
-      console.error('Error loading organization template:', error);
-    }
-  };
 
   const loadDatabaseStatus = async () => {
     try {
@@ -492,222 +465,6 @@ const Index = () => {
       ...settings,
       metals: []
     });
-  };
-
-  const handleExport = () => {
-    if (organizationTemplate) {
-      setShowExportDialog(true);
-    } else {
-      exportRawResults();
-    }
-  };
-
-  const exportRawResults = () => {
-    if (comparisonResults.length === 0) return;
-
-    const exportData = comparisonResults.map(result => ({
-      'Lieferant': result.supplierName,
-      'Schmelzerei': result.smelterName,
-      'Metall': result.metal,
-      'Land': result.country,
-      'Smelter ID': result.smelterIdentificationNumber || '',
-      'Status': result.matchStatus,
-      'Match Status': result.matchStatus,
-      'RMI Name': result.matchedFacilityName || '',
-      'Vergleichsdatum': new Date().toLocaleDateString('de-DE')
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Comparison Results');
-
-    const fileName = `ExcelMiner_Results_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-
-    toast({
-      title: "Export erfolgreich",
-      description: `Datei ${fileName} wurde heruntergeladen`,
-    });
-    
-    setShowExportDialog(false);
-  };
-
-  const exportFilledTemplate = async () => {
-    if (!organizationTemplate || comparisonResults.length === 0) return;
-
-    try {
-      let workbook = new ExcelJS.Workbook();
-
-      // Handle both new format (with binaryData) and old format (with sheets)
-      if (organizationTemplate.file_data.binaryData) {
-        // New format: Load from binary data
-        const templateBinaryData = organizationTemplate.file_data.binaryData;
-        await workbook.xlsx.load(Buffer.from(templateBinaryData, 'base64'));
-      } else if (organizationTemplate.file_data.sheets) {
-        // Old format: Recreate workbook from sheets data
-        console.log('Using old template format, recreating workbook from sheets data');
-        
-        // Create workbook from old format sheets data
-        const xlsxWorkbook = XLSX.utils.book_new();
-        
-        Object.entries(organizationTemplate.file_data.sheets).forEach(([sheetName, sheetData]: [string, any]) => {
-          const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-          XLSX.utils.book_append_sheet(xlsxWorkbook, worksheet, sheetName);
-        });
-        
-        // Convert XLSX workbook to buffer and then load into ExcelJS
-        const xlsxBuffer = XLSX.write(xlsxWorkbook, { type: 'buffer', bookType: 'xlsx' });
-        await workbook.xlsx.load(xlsxBuffer);
-      } else {
-        toast({
-          title: "Template-Format nicht unterstützt",
-          description: "Die Organisationsvorlage hat ein unbekanntes Format. Bitte laden Sie sie erneut hoch.",
-          variant: "destructive",
-        });
-        setShowExportDialog(false);
-        return;
-      }
-
-      // Get unique smelters with consolidated information
-      const uniqueSmelters = new Map();
-      comparisonResults.forEach(result => {
-        const key = `${result.smelterName}_${result.metal}_${result.country}`;
-        if (!uniqueSmelters.has(key)) {
-          uniqueSmelters.set(key, {
-            smelterName: result.smelterName,
-            metal: result.metal,
-            country: result.country,
-            smelterId: result.smelterIdentificationNumber || '',
-            conformityStatus: result.matchStatus,
-            suppliers: new Set([result.supplierName]),
-            rmiName: result.matchedFacilityName || result.smelterName,
-            rmiAssessmentStatus: result.rmiAssessmentStatus || ''
-          });
-        } else {
-          const existing = uniqueSmelters.get(key);
-          existing.suppliers.add(result.supplierName);
-          // Update status if we find a better status (prioritize conformant/active)
-          if ((result.matchStatus === 'conformant' || result.matchStatus === 'active') && 
-              (existing.conformityStatus === 'non-conformant' || existing.conformityStatus === 'attention-required')) {
-            existing.conformityStatus = result.matchStatus;
-          }
-        }
-      });
-
-      // Fill the Smelter List worksheet
-      const smelterWorksheet = workbook.getWorksheet('Smelter List');
-      if (smelterWorksheet) {
-        // Clear existing data from row 5 onwards, but preserve formatting
-        const maxRow = Math.max(100, smelterWorksheet.rowCount); // Ensure we clear enough rows
-        for (let rowNum = 5; rowNum <= maxRow; rowNum++) {
-          const row = smelterWorksheet.getRow(rowNum);
-          for (let colNum = 1; colNum <= 17; colNum++) { // A to Q
-            const cell = row.getCell(colNum);
-            cell.value = null; // Clear value but keep formatting
-          }
-        }
-
-        // Insert the consolidated smelter data starting at row 5
-        let currentRow = 5;
-        Array.from(uniqueSmelters.values()).forEach((smelter: any) => {
-          const row = smelterWorksheet.getRow(currentRow);
-          
-          // Fill columns according to CMRT template structure
-          row.getCell(1).value = smelter.smelterId; // Column A: Duplicate of Column F (Smelter ID)
-          row.getCell(2).value = smelter.metal; // Column B: Metal (*)
-          row.getCell(3).value = smelter.rmiName; // Column C: Smelter Look-up (*) - Keep RMI name for dropdown validation
-          row.getCell(4).value = smelter.smelterName; // Column D: Smelter Name (1)
-          row.getCell(5).value = smelter.country; // Column E: Smelter Country (*)
-          row.getCell(6).value = smelter.smelterId; // Column F: Smelter Identification
-          row.getCell(7).value = smelter.smelterId ? 'RMI' : ''; // Column G: Source
-          // Columns H-P (8-16): Leave empty as per requirements
-          for (let col = 8; col <= 16; col++) {
-            row.getCell(col).value = '';
-          }
-          
-          // Column Q: Status, suppliers, and verification date according to German translation
-          const statusTranslation = {
-            'conformant': 'Konform',
-            'active': 'Aktiv', 
-            'non-conformant': 'Nicht konform',
-            'attention-required': 'Erfordert Aufmerksamkeit'
-          };
-          const translatedStatus = statusTranslation[smelter.conformityStatus as keyof typeof statusTranslation] || smelter.conformityStatus;
-          
-          row.getCell(17).value = `Status: ${translatedStatus}\nLieferanten: ${Array.from(smelter.suppliers).join(', ')}\nPrüfdatum: ${new Date().toLocaleDateString('de-DE')}`; // Column Q: Comments
-          
-          currentRow++;
-        });
-      }
-
-      // Update Declaration sheet
-      const declarationWorksheet = workbook.getWorksheet('Declaration');
-      if (declarationWorksheet) {
-        const currentDate = new Date().toLocaleDateString('de-DE');
-        
-        // Try to find and update effective date - scan for cells containing "effective"
-        declarationWorksheet.eachRow((row, rowNumber) => {
-          row.eachCell((cell, colNumber) => {
-            if (cell.value && typeof cell.value === 'string' && 
-                cell.value.toLowerCase().includes('effective date')) {
-              // Update adjacent or nearby cell with current date
-              const targetCell = declarationWorksheet.getCell(rowNumber, colNumber + 1) || 
-                                 declarationWorksheet.getCell(rowNumber + 1, colNumber);
-              if (targetCell) {
-                targetCell.value = currentDate;
-              }
-            }
-          });
-        });
-
-        // Update description of scope with consolidation info
-        const totalSuppliers = new Set(comparisonResults.map(r => r.supplierName)).size;
-        const descriptionText = `Consolidated from ${totalSuppliers} suppliers, checked on ${currentDate}`;
-        
-        // Find description of scope field and update adjacent cell
-        declarationWorksheet.eachRow((row, rowNumber) => {
-          row.eachCell((cell, colNumber) => {
-            if (cell.value && typeof cell.value === 'string' && 
-                cell.value.toLowerCase().includes('description of scope')) {
-              const targetCell = declarationWorksheet.getCell(rowNumber, colNumber + 1) || 
-                                 declarationWorksheet.getCell(rowNumber + 1, colNumber);
-              if (targetCell) {
-                targetCell.value = descriptionText;
-              }
-            }
-          });
-        });
-      }
-
-      // Generate the output file
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-
-      // Download the file
-      const fileName = `${organizationTemplate.company_name || 'Organization'}_Consolidated_CMRT_${new Date().toISOString().split('T')[0]}.xlsx`;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Vorlage erfolgreich ausgefüllt",
-        description: `Konsolidierte CMRT-Datei ${fileName} wurde heruntergeladen`,
-      });
-
-      setShowExportDialog(false);
-    } catch (error) {
-      console.error('Error exporting filled template:', error);
-      toast({
-        title: "Export-Fehler",
-        description: "Fehler beim Ausfüllen der Organisationsvorlage",
-        variant: "destructive",
-      });
-    }
   };
 
   const formatDate = (dateString?: string) => {
@@ -1115,56 +872,10 @@ const Index = () => {
                 </CardHeader>
               </Card>
               <ComparisonResults results={comparisonResults} isProcessing={isComparing} summary={comparisonSummary} />
-              
-              {/* Export Results Button */}
-              <Card className="mt-4">
-                <CardContent className="pt-6">
-                  <Button onClick={handleExport} className="w-full">
-                    Export Results
-                  </Button>
-                </CardContent>
-              </Card>
             </div>
           )}
         </div>
       </div>
-
-      {/* Export Dialog */}
-      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export-Optionen</DialogTitle>
-            <DialogDescription>
-              Wählen Sie das Export-Format aus
-            </DialogDescription>
-          </DialogHeader>
-          
-          <RadioGroup value={exportOption} onValueChange={(value: 'raw' | 'template') => setExportOption(value)}>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="raw" id="raw" />
-                <Label htmlFor="raw">Export raw results</Label>
-              </div>
-              
-              {organizationTemplate && (
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="template" id="template" />
-                  <Label htmlFor="template">Export filled organization template</Label>
-                </div>
-              )}
-            </div>
-          </RadioGroup>
-          
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
-              Abbrechen
-            </Button>
-            <Button onClick={exportOption === 'template' ? exportFilledTemplate : exportRawResults}>
-              Export
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
