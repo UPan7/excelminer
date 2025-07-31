@@ -57,6 +57,7 @@ export type Database = {
           reassessment_in_progress: string | null
           rmi_cross_recognition: string | null
           smelter_id: string | null
+          smelter_reference: string | null
           standard_smelter_name: string | null
           state_province_region: string | null
           supply_chain_level: string | null
@@ -77,6 +78,7 @@ export type Database = {
           reassessment_in_progress?: string | null
           rmi_cross_recognition?: string | null
           smelter_id?: string | null
+          smelter_reference?: string | null
           standard_smelter_name?: string | null
           state_province_region?: string | null
           supply_chain_level?: string | null
@@ -97,6 +99,7 @@ export type Database = {
           reassessment_in_progress?: string | null
           rmi_cross_recognition?: string | null
           smelter_id?: string | null
+          smelter_reference?: string | null
           standard_smelter_name?: string | null
           state_province_region?: string | null
           supply_chain_level?: string | null
