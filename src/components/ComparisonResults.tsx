@@ -157,17 +157,35 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
     }
   };
 
+  // Status translation helper
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'conformant':
+        return 'Konform';
+      case 'active':
+        return 'Aktiv';
+      case 'non-conformant':
+        return 'Nicht konform';
+      case 'attention-required':
+        return 'Erfordert Aufmerksamkeit';
+      default:
+        return status;
+    }
+  };
+
   // Multi-select component
   const MultiSelect = ({ 
     options, 
     value, 
     onChange, 
-    placeholder 
+    placeholder,
+    isStatusFilter = false
   }: { 
     options: string[]; 
     value: string[]; 
     onChange: (value: string[]) => void; 
     placeholder: string;
+    isStatusFilter?: boolean;
   }) => {
     const [open, setOpen] = useState(false);
 
@@ -180,6 +198,14 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       onChange(newValue);
     };
 
+    const getDisplayValue = () => {
+      if (value.length === 0) return placeholder;
+      if (value.length === 1) {
+        return isStatusFilter ? getStatusLabel(value[0]) : value[0];
+      }
+      return `${value.length} ausgewählt`;
+    };
+
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -189,12 +215,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
             onClick={() => setOpen(!open)}
           >
             <span className="truncate">
-              {value.length === 0 
-                ? placeholder 
-                : value.length === 1 
-                  ? value[0] 
-                  : `${value.length} ausgewählt`
-              }
+              {getDisplayValue()}
             </span>
             <ChevronDown className="h-4 w-4 opacity-50" />
           </Button>
@@ -211,7 +232,9 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
                   checked={value.includes(option)}
                   onChange={() => {}} // Handled by parent onClick
                 />
-                <span className="text-sm">{option}</span>
+                <span className="text-sm">
+                  {isStatusFilter ? getStatusLabel(option) : option}
+                </span>
               </div>
             ))}
           </div>
@@ -437,6 +460,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
               value={statusFilter}
               onChange={setStatusFilter}
               placeholder="Alle Status"
+              isStatusFilter={true}
             />
 
             <MultiSelect
