@@ -331,7 +331,7 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Keine Standards ausgewählt",
-        description: "Bitte wählen Sie mindestens einen Standard für den Vergleich aus.",
+        description: "Bitte wählen Sie mindestens einen Standard für den Abgleich aus.",
       });
       return;
     }
@@ -400,7 +400,7 @@ const Index = () => {
       setComparisonSummary(summary);
 
       toast({
-        title: "Vergleich abgeschlossen",
+        title: "Abgleich abgeschlossen",
         description: `${allResults.length} Schmelzereien geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
       });
 
@@ -408,7 +408,7 @@ const Index = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
       toast({
         variant: "destructive",
-        title: "Vergleich fehlgeschlagen",
+        title: "Abgleich fehlgeschlagen",
         description: errorMessage,
       });
     } finally {
@@ -510,7 +510,7 @@ const Index = () => {
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-4">ExcelMiner</h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Professionelles Tool zum Vergleich von Lieferanten-Schmelzereien mit Referenzdaten.
+              Professionelles Tool zum Abgleich von Lieferanten-Schmelzereien mit Referenzdaten.
               Wählen Sie Standards und Metalle aus und laden Sie Ihre Lieferantendateien hoch.
             </p>
           </div>
@@ -565,7 +565,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="h-5 w-5" />
-                  Vergleichsparameter
+                  Abgleichsparameter
                 </CardTitle>
                 <CardDescription>
                   Wählen Sie Standards und Metalle für die Prüfung aus
@@ -575,7 +575,7 @@ const Index = () => {
               <CardContent className="space-y-6">
                 {/* Standards Selection */}
                 <div className="space-y-3">
-                  <Label className="text-base font-medium">Standards für Vergleich</Label>
+                  <Label className="text-base font-medium">Standards für Abgleich</Label>
                   <div className="grid grid-cols-3 gap-4">
                     {AVAILABLE_STANDARDS.map(standard => (
                       <div key={standard} className="flex items-center space-x-2">
@@ -738,9 +738,9 @@ const Index = () => {
             {/* Process Control */}
             <Card>
               <CardHeader>
-                <CardTitle>Vergleich starten</CardTitle>
+                <CardTitle>Abgleich starten</CardTitle>
                 <CardDescription>
-                  Überprüfen Sie die Einstellungen und starten Sie den Vergleich
+                  Überprüfen Sie die Einstellungen und starten Sie den Abgleich
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -783,7 +783,7 @@ const Index = () => {
                     {isComparing ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Vergleiche...
+                        Gleiche ab...
                       </>
                     ) : (
                       <>
@@ -867,7 +867,7 @@ const Index = () => {
             <div className="mb-8">
               <Card className="mb-4">
                 <CardHeader>
-                  <CardTitle>Vergleichsergebnis</CardTitle>
+                  <CardTitle>Abgleichergebnis</CardTitle>
                   <CardDescription>
                     Geprüft: {comparisonResults.length} Schmelzereien | 
                     Standards: {settings.standards.join(', ')} | 
