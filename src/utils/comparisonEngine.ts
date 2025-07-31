@@ -224,13 +224,13 @@ export class ComparisonEngine {
         matchStatus: 'attention-required'
       };
 
-      console.log(`Сравнение плавильни: ${smelter.smelterName}, ID: ${smelter.smelterIdentificationNumber}, Металл: ${smelter.metal}`);
+      // Processing smelter comparison...
       
       // Try exact match first
       const exactMatch = this.findExactMatch(smelter);
       
       if (exactMatch) {
-        console.log(`Точное совпадение найдено для ${smelter.smelterName}: ${exactMatch.match.standardFacilityName}, статус: ${exactMatch.match.assessmentStatus}`);
+        // Exact match found
         
         result.matchedFacilityName = exactMatch.match.standardFacilityName;
         result.matchedFacilityId = exactMatch.match.facilityId;
@@ -247,7 +247,7 @@ export class ComparisonEngine {
         const fuzzyMatch = this.findFuzzyMatch(smelter);
         
         if (fuzzyMatch) {
-          console.log(`Нечеткое совпадение найдено для ${smelter.smelterName}: ${fuzzyMatch.match.standardFacilityName}, оценка: ${fuzzyMatch.score}, статус: ${fuzzyMatch.match.assessmentStatus}`);
+          // Fuzzy match found
           
           result.matchedFacilityName = fuzzyMatch.match.standardFacilityName;
           result.matchedFacilityId = fuzzyMatch.match.facilityId;

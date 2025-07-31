@@ -92,8 +92,7 @@ const ReferenceDataManagement = () => {
       const headers = data[0];
       const rows = data.slice(1);
       
-      console.log('CSV Headers found:', headers);
-      console.log('Total rows to process:', rows.length);
+      // Processing CSV data...
 
       // Map headers to database columns with more flexible matching
       const headerMapping = {
@@ -142,13 +141,13 @@ const ReferenceDataManagement = () => {
         
         if (index !== -1) {
           columnIndices[headerMapping[headerName as keyof typeof headerMapping]] = index;
-          console.log(`Mapped header "${headerName}" to column ${index}: "${headers[index]}"`);
+          // Header mapped successfully
         } else {
-          console.warn(`Header "${headerName}" not found in CSV`);
+          // Header not found in CSV
         }
       });
       
-      console.log('Column indices mapping:', columnIndices);
+      // Column mapping completed
 
       setUploadProgress(prev => ({ ...prev, [listType]: 20 }));
 
@@ -206,16 +205,9 @@ const ReferenceDataManagement = () => {
           return facility;
         });
         
-      console.log('Raw facilities before filtering:', facilities.length);
-      console.log('Sample facility object:', facilities[0]);
-      
       const filteredFacilities = facilities.filter(facility => facility.smelter_id || facility.standard_smelter_name);
       
-      console.log('Filtered facilities:', filteredFacilities.length);
-      console.log('Sample filtered facility:', filteredFacilities[0]);
-      
       if (filteredFacilities.length === 0) {
-        console.error('No valid facilities found. Check header mapping and data format.');
         throw new Error('Keine gültigen Datensätze in der Datei gefunden. Bitte prüfen Sie das Datenformat und die Kopfzeilen.');
       }
 
