@@ -376,7 +376,8 @@ const Index = () => {
         assessmentStatus: `${facility.list_type}: ${facility.assessment_status || 'Conformant'}`, // Include standard in status
         countryLocation: facility.country_location || '',
         stateProvinceRegion: facility.state_province_region || '',
-        city: facility.city || ''
+        city: facility.city || '',
+        smelterReference: facility.smelter_reference || ''
       }));
 
       const engine = createComparisonEngine(rmiData, settings.standards, settings.metals);

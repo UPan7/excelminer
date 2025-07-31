@@ -15,6 +15,7 @@ export interface RMIData {
   countryLocation?: string;
   stateProvinceRegion?: string;
   city?: string;
+  smelterReference?: string;
 }
 
 export interface ComparisonResult {
@@ -34,6 +35,7 @@ export interface ComparisonResult {
   countryLocation?: string;
   stateProvinceRegion?: string;
   city?: string;
+  smelterReference?: string;
 }
 
 export interface ComparisonSummary {
@@ -244,9 +246,10 @@ export class ComparisonEngine {
         result.confidenceScore = 1.0;
         result.matchedStandards = exactMatch.standards;
         result.sourceStandard = exactMatch.standards[0];
-        result.countryLocation = exactMatch.match.countryLocation;
-        result.stateProvinceRegion = exactMatch.match.stateProvinceRegion;
-        result.city = exactMatch.match.city;
+         result.countryLocation = exactMatch.match.countryLocation;
+         result.stateProvinceRegion = exactMatch.match.stateProvinceRegion;
+         result.city = exactMatch.match.city;
+         result.smelterReference = exactMatch.match.smelterReference;
         
         // Determine status based on assessment status
         const conformityStatus = this.getConformityStatus(exactMatch.match.assessmentStatus);
@@ -264,9 +267,10 @@ export class ComparisonEngine {
           result.confidenceScore = fuzzyMatch.score;
           result.matchedStandards = fuzzyMatch.standards;
           result.sourceStandard = fuzzyMatch.standards[0];
-          result.countryLocation = fuzzyMatch.match.countryLocation;
-          result.stateProvinceRegion = fuzzyMatch.match.stateProvinceRegion;
-          result.city = fuzzyMatch.match.city;
+           result.countryLocation = fuzzyMatch.match.countryLocation;
+           result.stateProvinceRegion = fuzzyMatch.match.stateProvinceRegion;
+           result.city = fuzzyMatch.match.city;
+           result.smelterReference = fuzzyMatch.match.smelterReference;
           
           // For fuzzy matches with high confidence
           if (fuzzyMatch.score >= 0.8) {
