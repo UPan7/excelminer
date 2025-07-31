@@ -100,6 +100,7 @@ const ReferenceDataManagement = () => {
         'Metal': 'metal',
         'Standard Facility Name': 'standard_smelter_name',
         'Country Location': 'country_location',
+        'City': 'city',
         'State/ Province/ Region': 'state_province_region',
         'Assessment Status': 'assessment_status',
         'Operational Status': 'operational_status',
@@ -128,6 +129,7 @@ const ReferenceDataManagement = () => {
             'Facility ID': ['smelter id', 'facility_id', 'id'],
             'Standard Facility Name': ['facility name', 'smelter name', 'name'],
             'Country Location': ['country', 'location'],
+            'City': ['city', 'smelter city', 'facility city', 'location city'],
             'State/ Province/ Region': ['state', 'province', 'region']
           };
           
