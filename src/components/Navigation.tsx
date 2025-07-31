@@ -28,7 +28,7 @@ const Navigation: React.FC<NavigationProps> = ({ referenceDataStatus }) => {
 
   return (
     <nav className="bg-card border-b shadow-sm">
-      <div className="container mx-auto px-24 py-4">
+      <div className="container mx-auto px-30 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1">
             <div className="mr-6">
