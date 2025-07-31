@@ -297,7 +297,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
       'Smelter Identification Number Input Column': result.smelterIdentificationNumber || '',
       'Metal (*)': result.metal || '',
       'Smelter Look-up (*)': result.smelterName || '',
-      'Smelter Name (1)': result.smelterName || '',
+      'Smelter Name (1)': '',
       'Smelter Country (*)': result.countryLocation || result.country || '',
       'Smelter Identification': result.smelterIdentificationNumber || '',
       'Source of Smelter Identification Number': 'RMI',
