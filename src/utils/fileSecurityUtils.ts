@@ -125,7 +125,8 @@ export const sanitizeFileName = (fileName: string): string => {
   const maxLength = 255;
   if (sanitized.length > maxLength) {
     const extension = getFileExtension(sanitized);
-    const nameWithoutExt = sanitized.substring(0, sanitized.lastIndexOf('.') || sanitized.length);
+    const dotIndex = sanitized.lastIndexOf('.');
+    const nameWithoutExt = sanitized.substring(0, dotIndex !== -1 ? dotIndex : sanitized.length);
     const truncatedName = nameWithoutExt.substring(0, maxLength - extension.length - 1);
     return truncatedName + extension;
   }
