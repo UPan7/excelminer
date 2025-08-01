@@ -15,6 +15,7 @@ import { ErrorDisplay } from "@/components/ErrorDisplay";
 import { AuthenticationError, isExcelMinerError } from "@/types/errors";
 import { authFormSchema } from "@/schemas/validationSchemas";
 import { showErrorToast, showSuccessToast, convertSupabaseError } from "@/utils/errorHandling";
+import { auditLogger } from "@/utils/auditLogger";
 
 interface AuthPageProps {
   onAuthSuccess?: (user: User, session: Session) => void;
@@ -112,6 +113,9 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         handleAuthSuccess(authData.user, authData.session);
       }
     } catch (error) {
+      // Log failed login attempt
+      await auditLogger.logLoginFailure(data.email, error instanceof Error ? error.message : 'Unknown error');
+      
       if (isExcelMinerError(error)) {
         setAuthError(error);
         showErrorToast(error);

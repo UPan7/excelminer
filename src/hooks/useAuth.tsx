@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { auditLogger } from "@/utils/auditLogger";
 
 interface AuthContextType {
   user: User | null;
@@ -25,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Fetch user role when user signs in
+        // Fetch user role when user signs in and log audit event
         if (session?.user) {
           setTimeout(async () => {
             try {
@@ -36,6 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .single();
               
               setUserRole(profile?.role || 'viewer');
+              
+              // Log successful login
+              if (event === 'SIGNED_IN') {
+                await auditLogger.logUserLogin(session.user.id, {
+                  email: session.user.email,
+                  role: profile?.role || 'viewer'
+                });
+              }
             } catch (error) {
               console.error('Error fetching user role:', error);
               setUserRole('viewer');
@@ -43,6 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }, 0);
         } else {
           setUserRole(null);
+          
+          // Log logout if this was a sign out event
+          if (event === 'SIGNED_OUT' && user) {
+            setTimeout(async () => {
+              await auditLogger.logUserLogout(user.id);
+            }, 0);
+          }
         }
         
         setLoading(false);

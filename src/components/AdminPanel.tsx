@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserPlus, Shield } from 'lucide-react';
+import { auditLogger } from '@/utils/auditLogger';
 
 interface User {
   user_id: string;
@@ -57,12 +58,21 @@ export function AdminPanel() {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
+      // Get the current user info for audit logging
+      const oldUser = users.find(u => u.user_id === userId);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
       const { error } = await supabase
         .from('profiles')
         .update({ role: newRole })
         .eq('user_id', userId);
       
       if (error) throw error;
+      
+      // Log role change
+      if (oldUser && currentUser) {
+        await auditLogger.logRoleChange(userId, oldUser.role, newRole, currentUser.id);
+      }
       
       await fetchUsers();
       toast({
@@ -89,6 +99,9 @@ export function AdminPanel() {
       });
       
       if (error) throw error;
+      
+      // Log user invitation
+      await auditLogger.logUserInvitation(inviteEmail, 'viewer');
       
       setInviteEmail('');
       toast({

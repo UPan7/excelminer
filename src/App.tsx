@@ -10,6 +10,7 @@ import ReferenceDataManagement from "./pages/ReferenceDataManagement";
 import AuthPage from "./components/AuthPage";
 import NotFound from "./pages/NotFound";
 import { AdminPanel } from "./components/AdminPanel";
+import { AuditLogViewer } from "./components/AuditLogViewer";
 
 const queryClient = new QueryClient();
 
@@ -32,11 +33,16 @@ const App = () => (
                 <ReferenceDataManagement />
               </ProtectedRoute>
             } />
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <AdminPanel />
-              </ProtectedRoute>
-            } />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <AdminPanel />
+            </ProtectedRoute>
+          } />
+          <Route path="/audit-logs" element={
+            <ProtectedRoute>
+              <AuditLogViewer />
+            </ProtectedRoute>
+          } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={
               <ProtectedRoute>

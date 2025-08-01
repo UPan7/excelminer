@@ -317,9 +317,12 @@ export const validateDatabaseInput = {
 /**
  * Security audit logging
  */
+// Import audit logger for database persistence
+import { auditLogger } from './auditLogger';
+
 export const securityAudit = {
   /**
-   * Logs security-relevant events
+   * Logs security-relevant events (enhanced with database persistence)
    */
   logEvent: (event: string, details?: any): void => {
     const auditEntry = {
@@ -329,10 +332,13 @@ export const securityAudit = {
       userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
     };
     
-    // In production, this would be sent to a secure logging service
+    // Console logging for development
     if (process.env.NODE_ENV === 'development') {
       console.log('Security Audit:', auditEntry);
     }
+    
+    // Also persist to database
+    auditLogger.logSecurityEvent(event, details || {}).catch(console.error);
   },
   
   /**
@@ -343,6 +349,8 @@ export const securityAudit = {
       email: email ? email.substring(0, 3) + '***' : 'unknown',
       reason
     });
+    // Direct database logging for auth failures
+    auditLogger.logLoginFailure(email, reason).catch(console.error);
   },
   
   /**
@@ -353,6 +361,7 @@ export const securityAudit = {
       userId: userId ? 'user_' + userId.substring(0, 8) : 'anonymous',
       operation
     });
+    auditLogger.logSecurityEvent('RATE_LIMIT_VIOLATION', { userId, operation }).catch(console.error);
   },
   
   /**
@@ -364,5 +373,6 @@ export const securityAudit = {
       event,
       details
     });
+    auditLogger.logFileUpload(fileName, details?.fileSize || 0, { event, ...details }).catch(console.error);
   }
 };
