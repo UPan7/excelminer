@@ -2,11 +2,20 @@ import { supabase } from '@/integrations/supabase/client';
 import type { CreateAuditLogParams, AuditActionType } from '@/types/audit';
 
 class AuditLogger {
-  private getClientInfo() {
+  private async getClientInfo() {
+    // Get current session to derive a stable session_id
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Use session access token to create consistent session_id
+    // If no session, fallback to random ID
+    const session_id = session?.access_token 
+      ? session.access_token.slice(-9) // Last 9 chars of access token
+      : Math.random().toString(36).substr(2, 9);
+    
     return {
       ip_address: null, // IP is handled server-side
       user_agent: navigator.userAgent,
-      session_id: Math.random().toString(36).substr(2, 9)
+      session_id
     };
   }
 
@@ -18,7 +27,7 @@ class AuditLogger {
         console.warn('Failed to get user for audit log:', authError);
       }
 
-      const clientInfo = this.getClientInfo();
+      const clientInfo = await this.getClientInfo();
       
       const auditData = {
         user_id: user?.id || null,
