@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Home, CheckCircle, AlertTriangle, User, LogOut } from 'lucide-react';
+import { Database, Home, CheckCircle, AlertTriangle, User, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -22,7 +22,7 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ referenceDataStatus }) => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, userRole } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -52,18 +52,35 @@ const Navigation: React.FC<NavigationProps> = ({ referenceDataStatus }) => {
               </Button>
             </Link>
             
-            <Link to="/reference-data">
-              <Button 
-                variant={isActive('/reference-data') ? 'default' : 'ghost'}
-                className={cn(
-                  "flex items-center gap-2",
-                  isActive('/reference-data') && "bg-primary text-primary-foreground"
-                )}
-              >
-                <Database className="h-4 w-4" />
-                Referenzdaten
-              </Button>
-            </Link>
+            {userRole === 'admin' && (
+              <Link to="/reference-data">
+                <Button 
+                  variant={isActive('/reference-data') ? 'default' : 'ghost'}
+                  className={cn(
+                    "flex items-center gap-2",
+                    isActive('/reference-data') && "bg-primary text-primary-foreground"
+                  )}
+                >
+                  <Database className="h-4 w-4" />
+                  Referenzdaten
+                </Button>
+              </Link>
+            )}
+            
+            {userRole === 'admin' && (
+              <Link to="/admin">
+                <Button 
+                  variant={isActive('/admin') ? 'default' : 'ghost'}
+                  className={cn(
+                    "flex items-center gap-2",
+                    isActive('/admin') && "bg-primary text-primary-foreground"
+                  )}
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin
+                </Button>
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -103,20 +120,27 @@ const Navigation: React.FC<NavigationProps> = ({ referenceDataStatus }) => {
             )}
 
             {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    {user.email}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={signOut} className="flex items-center gap-2">
-                    <LogOut className="h-4 w-4" />
-                    Abmelden
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                {userRole && (
+                  <Badge variant={userRole === 'admin' ? 'default' : 'secondary'}>
+                    {userRole === 'admin' ? 'Admin' : 'User'}
+                  </Badge>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      {user.email}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={signOut} className="flex items-center gap-2">
+                      <LogOut className="h-4 w-4" />
+                      Abmelden
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </div>

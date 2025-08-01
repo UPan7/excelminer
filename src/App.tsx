@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import ReferenceDataManagement from "./pages/ReferenceDataManagement";
 import AuthPage from "./components/AuthPage";
 import NotFound from "./pages/NotFound";
+import { AdminPanel } from "./components/AdminPanel";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,11 @@ const App = () => (
             <Route path="/reference-data" element={
               <ProtectedRoute>
                 <ReferenceDataManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminPanel />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
