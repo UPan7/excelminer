@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserPlus, Shield } from 'lucide-react';
 import { auditLogger } from '@/utils/auditLogger';
+import Navigation from '@/components/Navigation';
 
 interface User {
   user_id: string;
@@ -122,100 +123,124 @@ export function AdminPanel() {
 
   if (userRole !== 'admin') {
     return (
-      <Card className="max-w-md mx-auto mt-8">
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground">
-            <Shield className="h-12 w-12 mx-auto mb-4" />
-            <p>Zugriff verweigert. Administratorrechte erforderlich.</p>
+      <>
+        <Navigation />
+        <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
+          <div className="max-w-6xl mx-auto">
+            <Card className="max-w-md mx-auto mt-8">
+              <CardContent className="pt-6">
+                <div className="text-center text-muted-foreground">
+                  <Shield className="h-12 w-12 mx-auto mb-4" />
+                  <p>Zugriff verweigert. Administratorrechte erforderlich.</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <>
+        <Navigation />
+        <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center space-x-2">
-        <Shield className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Admin Panel</h1>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <UserPlus className="h-5 w-5" />
-            <span>Benutzer einladen</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex space-x-2">
-            <Input
-              placeholder="E-Mail-Adresse"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              type="email"
-            />
-            <Button onClick={inviteUser} disabled={inviting}>
-              {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Einladen'}
-            </Button>
+    <>
+      <Navigation />
+      <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 p-6">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-4xl font-bold text-foreground flex items-center justify-center gap-2">
+              <Shield className="h-8 w-8" />
+              Admin Panel
+            </h1>
+            <p className="text-muted-foreground">
+              Benutzerverwaltung und administrative Funktionen
+            </p>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Benutzerverwaltung</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>E-Mail</TableHead>
-                <TableHead>Rolle</TableHead>
-                <TableHead>Erstellt am</TableHead>
-                <TableHead>Aktionen</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.user_id}>
-                  <TableCell>{user.email || 'Nicht verfügbar'}</TableCell>
-                  <TableCell>
-                    <Select
-                      value={user.role}
-                      onValueChange={(value) => updateUserRole(user.user_id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(user.created_at).toLocaleDateString('de-DE')}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                      {user.role === 'admin' ? 'Administrator' : 'Benutzer'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <UserPlus className="h-5 w-5" />
+                <span>Benutzer einladen</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="E-Mail-Adresse"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  type="email"
+                />
+                <Button onClick={inviteUser} disabled={inviting}>
+                  {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Einladen'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Benutzerverwaltung</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>E-Mail</TableHead>
+                    <TableHead>Rolle</TableHead>
+                    <TableHead>Erstellt am</TableHead>
+                    <TableHead>Aktionen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.user_id}>
+                      <TableCell>{user.email || 'Nicht verfügbar'}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={user.role}
+                          onValueChange={(value) => updateUserRole(user.user_id, value)}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="user">User</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(user.created_at).toLocaleDateString('de-DE')}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role === 'admin' ? 'Administrator' : 'Benutzer'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </>
   );
 }
