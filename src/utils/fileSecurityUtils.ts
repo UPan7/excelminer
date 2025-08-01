@@ -1,4 +1,5 @@
 import { FileParsingError, ValidationError } from '@/types/errors';
+import { MAX_FILE_SIZE } from '@/utils/errorHandling';
 
 // File signature magic numbers for validation
 const FILE_SIGNATURES = {
@@ -10,7 +11,7 @@ const FILE_SIGNATURES = {
   CSV_UTF8: [0xEF, 0xBB, 0xBF], // UTF-8 BOM (optional)
 } as const;
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
 
 // Rate limiting storage

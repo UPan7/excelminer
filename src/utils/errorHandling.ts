@@ -10,6 +10,9 @@ import {
   isExcelMinerError 
 } from '@/types/errors';
 
+// Shared maximum file size constant
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 // Enhanced toast notifications for different error types
 export const showErrorToast = (error: Error | ExcelMinerError, options?: {
   title?: string;
@@ -180,12 +183,11 @@ export const validateFileType = (file: File): void => {
     );
   }
   
-  // Check file size (10MB limit)
-  const maxSize = 10 * 1024 * 1024; // 10MB
-  if (file.size > maxSize) {
+  // Check file size using shared limit
+  if (file.size > MAX_FILE_SIZE) {
     throw new FileParsingError(
-      `Datei ist zu groß. Maximale Dateigröße ist 10MB.`,
-      { fileName: file.name, fileSize: file.size, maxSize }
+      `Datei ist zu groß. Maximale Dateigröße ist ${(MAX_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB.`,
+      { fileName: file.name, fileSize: file.size, maxSize: MAX_FILE_SIZE }
     );
   }
 };
