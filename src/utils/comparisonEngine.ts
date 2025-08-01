@@ -335,8 +335,8 @@ export class ComparisonEngine {
       ).length;
       byStandard[standard] = {
         conformant: standardConformant,
-        total: results.filter(r => this.metalsChecked.includes(r.metal)).length, // Total results for this standard
-        percentage: results.length > 0 ? Math.round((standardConformant / results.length) * 100) : 0
+        total: standardResults.length, // Use actual count for this standard
+        percentage: standardResults.length > 0 ? Math.round((standardConformant / standardResults.length) * 100) : 0
       };
     });
 
