@@ -24,6 +24,7 @@ import {
 import { 
   validateData, 
   fileValidationSchema, 
+  cmrtDataSchema,
   cmrtDataArraySchema, 
   comparisonSettingsSchema,
   uploadedFileSchema 
@@ -265,8 +266,9 @@ const Index = () => {
               const smelterName = row[smelterNameIndex] || '';
               const metal = row[metalIndex] || '';
               
-              if (smelterName && smelterName.toString().trim()) {
-                const cmrtData: CMRTData = {
+              // Only process rows with required data
+              if (smelterName && smelterName.toString().trim() && metal && metal.toString().trim()) {
+                const cmrtData = {
                   metal: metal.toString().trim(),
                   smelterName: smelterName.toString().trim(),
                   smelterCountry: (row[countryIndex] || '').toString().trim(),
@@ -275,8 +277,8 @@ const Index = () => {
                 
                 // Validate individual CMRT data entry
                 try {
-                  validateData(cmrtDataArraySchema.element, cmrtData, `Row ${i + 1}`);
-                  supplierData.push(cmrtData);
+                  const validatedEntry = validateData(cmrtDataSchema, cmrtData, `Row ${i + 1}`) as CMRTData;
+                  supplierData.push(validatedEntry);
                 } catch (validationError) {
                   console.warn(`Skipping invalid row ${i + 1}:`, validationError);
                 }
@@ -291,10 +293,7 @@ const Index = () => {
             );
           }
           
-              // Validate the complete dataset
-              const validatedData = validateData(cmrtDataArraySchema, supplierData, 'Supplier data');
-              
-              resolve({ supplierName, smelterData: validatedData });
+          resolve({ supplierName, smelterData: supplierData });
         } catch (error) {
           if (error instanceof FileParsingError || error instanceof ValidationError) {
             reject(error);
