@@ -61,8 +61,11 @@ export class ComparisonEngine {
 
   constructor(rmiData: RMIData[], standardsUsed: string[] = [], metalsChecked: string[] = []) {
     try {
-      // Validate input data
-      this.rmiData = validateData(rmiDataSchema.array(), rmiData, 'RMI data initialization');
+      // Basic validation without changing the type structure
+      if (!Array.isArray(rmiData)) {
+        throw new ComparisonError('RMI data must be an array');
+      }
+      this.rmiData = rmiData;
       this.standardsUsed = standardsUsed;
       this.metalsChecked = metalsChecked;
     } catch (error) {

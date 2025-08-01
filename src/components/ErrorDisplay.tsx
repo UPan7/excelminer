@@ -57,12 +57,12 @@ const getErrorSeverity = (error: Error): 'error' | 'warning' | 'info' => {
   return 'error';
 };
 
-const getErrorColor = (error: Error) => {
+const getErrorColor = (error: Error): "default" | "destructive" => {
   const severity = getErrorSeverity(error);
   switch (severity) {
     case 'error': return 'destructive';
-    case 'warning': return 'default';
-    case 'info': return 'secondary';
+    case 'warning': return 'destructive'; // Using destructive for warnings since Alert only supports default/destructive
+    case 'info': return 'default';
     default: return 'destructive';
   }
 };
