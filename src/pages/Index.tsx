@@ -12,6 +12,29 @@ import { ComparisonResults, type ComparisonResult, type ComparisonSummary } from
 import { ComparisonEngine, createComparisonEngine, type CMRTData, type RMIData } from '@/utils/comparisonEngine';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { 
+  FileParsingError, 
+  ValidationError, 
+  DatabaseError, 
+  ComparisonError,
+  isExcelMinerError 
+} from '@/types/errors';
+import { 
+  validateData, 
+  fileValidationSchema, 
+  cmrtDataArraySchema, 
+  comparisonSettingsSchema,
+  uploadedFileSchema 
+} from '@/schemas/validationSchemas';
+import { 
+  showErrorToast, 
+  showSuccessToast, 
+  convertSupabaseError, 
+  validateFileType,
+  withErrorHandling 
+} from '@/utils/errorHandling';
 
 interface SupplierFileData {
   id: string;
@@ -64,47 +87,45 @@ const Index = () => {
     loadDatabaseStatus();
   }, []);
 
-  const loadDatabaseStatus = async () => {
-    try {
-      const { data: statsData, error: statsError } = await supabase
-        .rpc('get_reference_stats');
+  const loadDatabaseStatus = withErrorHandling(async () => {
+    const { data: statsData, error: statsError } = await supabase
+      .rpc('get_reference_stats');
 
-      if (statsError) throw statsError;
+    if (statsError) throw convertSupabaseError(statsError);
 
-      // Get unique metals from database efficiently
-      const { data: metalData, error: metalError } = await supabase
-        .from('reference_facilities')
-        .select('metal', { count: 'exact' })
-        .not('metal', 'is', null)
-        .order('metal');
+    // Get unique metals from database efficiently
+    const { data: metalData, error: metalError } = await supabase
+      .from('reference_facilities')
+      .select('metal', { count: 'exact' })
+      .not('metal', 'is', null)
+      .order('metal');
 
-      if (metalError) throw metalError;
+    if (metalError) throw convertSupabaseError(metalError);
 
-      const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(Boolean))].sort();
-      setAvailableMetals(uniqueMetals);
+    const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(Boolean))].sort();
+    setAvailableMetals(uniqueMetals);
 
-      const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
-      const isReady = totalRecords > 0;
+    const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
+    const isReady = totalRecords > 0;
 
-      const details = AVAILABLE_STANDARDS.map(type => {
-        const stat = (statsData || []).find((s: any) => s.list_type === type);
-        return {
-          type,
-          count: stat?.total_facilities || 0,
-          lastUpdated: stat?.last_updated,
-          metalCounts: (stat?.metal_counts || {}) as { [metal: string]: number }
-        };
-      });
+    const details = AVAILABLE_STANDARDS.map(type => {
+      const stat = (statsData || []).find((s: any) => s.list_type === type);
+      return {
+        type,
+        count: stat?.total_facilities || 0,
+        lastUpdated: stat?.last_updated,
+        metalCounts: (stat?.metal_counts || {}) as { [metal: string]: number }
+      };
+    });
 
-      setDbStatus({
-        isReady,
-        totalRecords,
-        details
-      });
-    } catch (error) {
-      console.error('Error loading database status:', error);
-    }
-  };
+    setDbStatus({
+      isReady,
+      totalRecords,
+      details
+    });
+
+    showSuccessToast('Datenbank-Status aktualisiert', `${totalRecords} Datensätze verfügbar`);
+  }, 'Database status loading');
 
   const parseCSVFile = (text: string): string[][] => {
     const lines = text.split('\n');
@@ -138,6 +159,9 @@ const Index = () => {
   };
 
   const parseSupplierFile = async (file: File): Promise<{ supplierName: string; smelterData: CMRTData[] }> => {
+    // Validate file first
+    validateFileType(file);
+    
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       const isCSV = file.name.toLowerCase().endsWith('.csv');
@@ -149,10 +173,17 @@ const Index = () => {
           
           if (isCSV) {
             const text = e.target?.result as string;
+            if (!text || text.trim().length === 0) {
+              throw new FileParsingError('CSV-Datei ist leer oder konnte nicht gelesen werden', { fileName: file.name });
+            }
             jsonData = parseCSVFile(text);
           } else {
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
+            
+            if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+              throw new FileParsingError('Excel-Datei enthält keine Arbeitsblätter', { fileName: file.name });
+            }
             
             // Try to extract supplier name from Declaration sheet
             if (workbook.Sheets['Declaration']) {
@@ -177,7 +208,14 @@ const Index = () => {
             }
             
             let worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
+            if (!worksheet) {
+              throw new FileParsingError('Kein gültiges Arbeitsblatt gefunden', { fileName: file.name, availableSheets: workbook.SheetNames });
+            }
             jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          }
+          
+          if (!jsonData || jsonData.length === 0) {
+            throw new FileParsingError('Datei enthält keine Daten', { fileName: file.name });
           }
           
           let headerRowIndex = 3;
@@ -197,7 +235,10 @@ const Index = () => {
           }
           
           if (headerRowIndex === -1) {
-            throw new Error('Could not find header row in supplier file');
+            throw new FileParsingError(
+              'Konnte keine Kopfzeile mit Metall- oder Schmelzerei-Spalten finden. Überprüfen Sie das Dateiformat.', 
+              { fileName: file.name, dataPreview: jsonData.slice(0, 10) }
+            );
           }
           
           const headers = jsonData[headerRowIndex] as string[];
@@ -225,22 +266,48 @@ const Index = () => {
               const metal = row[metalIndex] || '';
               
               if (smelterName && smelterName.toString().trim()) {
-                supplierData.push({
+                const cmrtData: CMRTData = {
                   metal: metal.toString().trim(),
                   smelterName: smelterName.toString().trim(),
                   smelterCountry: (row[countryIndex] || '').toString().trim(),
                   smelterIdentificationNumber: (row[idIndex] || '').toString().trim(),
-                });
+                };
+                
+                // Validate individual CMRT data entry
+                try {
+                  validateData(cmrtDataArraySchema.element, cmrtData, `Row ${i + 1}`);
+                  supplierData.push(cmrtData);
+                } catch (validationError) {
+                  console.warn(`Skipping invalid row ${i + 1}:`, validationError);
+                }
               }
             }
           }
           
-          resolve({ supplierName, smelterData: supplierData });
+          if (supplierData.length === 0) {
+            throw new FileParsingError(
+              'Keine gültigen Schmelzerei-Daten gefunden. Überprüfen Sie die Spaltenüberschriften und Datenformat.', 
+              { fileName: file.name, headers, expectedColumns: ['Metal', 'Smelter Name', 'Country'] }
+            );
+          }
+          
+              // Validate the complete dataset
+              const validatedData = validateData(cmrtDataArraySchema, supplierData, 'Supplier data');
+              
+              resolve({ supplierName, smelterData: validatedData });
         } catch (error) {
-          reject(error);
+          if (error instanceof FileParsingError || error instanceof ValidationError) {
+            reject(error);
+          } else {
+            reject(new FileParsingError(
+              `Unerwarteter Fehler beim Verarbeiten der Datei: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
+              { fileName: file.name, originalError: error }
+            ));
+          }
         }
       };
-      reader.onerror = () => reject(new Error('Failed to read file'));
+      
+      reader.onerror = () => reject(new FileParsingError('Fehler beim Lesen der Datei', { fileName: file.name }));
       
       if (isCSV) {
         reader.readAsText(file, 'utf-8');
@@ -258,46 +325,89 @@ const Index = () => {
     try {
       const result = await parseSupplierFile(file);
       
+      // Validate the processed file data
+      const validatedFileData = validateData(uploadedFileSchema, {
+        ...fileData,
+        status: 'complete' as const,
+        data: result.smelterData,
+        supplierName: result.supplierName
+      }, 'Processed file data');
+      
       setSupplierFiles(prev => prev.map(f => 
         f.id === fileData.id 
           ? { ...f, status: 'complete', data: result.smelterData, supplierName: result.supplierName }
           : f
       ));
 
-      toast({
-        title: "Lieferantendatei erfolgreich verarbeitet",
-        description: `${file.name} wurde geparst: ${result.smelterData.length} Schmelzereien gefunden. Lieferant: ${result.supplierName}`,
-      });
+      showSuccessToast(
+        "Lieferantendatei erfolgreich verarbeitet",
+        `${file.name} wurde geparst: ${result.smelterData.length} Schmelzereien gefunden. Lieferant: ${result.supplierName}`
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
+      if (isExcelMinerError(error)) {
+        showErrorToast(error);
+      } else {
+        const fileError = new FileParsingError(
+          error instanceof Error ? error.message : 'Unbekannter Fehler bei der Dateiverarbeitung',
+          { fileName: file.name, originalError: error }
+        );
+        showErrorToast(fileError);
+      }
       
       setSupplierFiles(prev => prev.map(f => 
         f.id === fileData.id 
-          ? { ...f, status: 'error', error: errorMessage }
+          ? { ...f, status: 'error', error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
           : f
       ));
-
-      toast({
-        variant: "destructive",
-        title: "Verarbeitung fehlgeschlagen",
-        description: errorMessage,
-      });
     }
   };
 
   const handleFileUpload = useCallback((uploadedFiles: FileList) => {
-    const newFiles: SupplierFileData[] = Array.from(uploadedFiles).map(file => ({
-      id: `${Date.now()}-${Math.random()}`,
-      name: file.name,
-      status: 'pending',
-      size: file.size,
-    }));
+    try {
+      // Validate each file before processing
+      const validFiles: File[] = [];
+      const fileErrors: string[] = [];
+      
+      Array.from(uploadedFiles).forEach(file => {
+        try {
+          validateFileType(file);
+          validFiles.push(file);
+        } catch (error) {
+          const fileName = file.name;
+          const errorMsg = error instanceof Error ? error.message : 'Unbekannter Dateifehler';
+          fileErrors.push(`${fileName}: ${errorMsg}`);
+        }
+      });
+      
+      if (fileErrors.length > 0) {
+        showErrorToast(new ValidationError(
+          'Einige Dateien konnten nicht verarbeitet werden',
+          { fileErrors }
+        ));
+      }
+      
+      if (validFiles.length === 0) {
+        return;
+      }
+      
+      const newFiles: SupplierFileData[] = validFiles.map(file => ({
+        id: `${Date.now()}-${Math.random()}`,
+        name: file.name,
+        status: 'pending',
+        size: file.size,
+      }));
 
-    setSupplierFiles(prev => [...prev, ...newFiles]);
+      setSupplierFiles(prev => [...prev, ...newFiles]);
 
-    Array.from(uploadedFiles).forEach((file, index) => {
-      processSupplierFile(newFiles[index], file);
-    });
+      validFiles.forEach((file, index) => {
+        processSupplierFile(newFiles[index], file);
+      });
+    } catch (error) {
+      showErrorToast(new ValidationError(
+        'Fehler beim Hochladen der Dateien',
+        { originalError: error }
+      ));
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -327,90 +437,104 @@ const Index = () => {
   }, [handleFileUpload]);
 
   const runComparison = async () => {
-    if (settings.standards.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Keine Standards ausgewählt",
-        description: "Bitte wählen Sie mindestens einen Standard für den Abgleich aus.",
-      });
-      return;
-    }
-
-    if (settings.metals.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Keine Metalle ausgewählt",
-        description: "Bitte wählen Sie mindestens ein Metall für die Prüfung aus.",
-      });
-      return;
-    }
-
-    const completeFiles = supplierFiles.filter(f => f.status === 'complete' && f.data);
-    if (completeFiles.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Keine Lieferantendateien",
-        description: "Bitte laden Sie mindestens eine Lieferantendatei hoch.",
-      });
-      return;
-    }
-
-    setIsComparing(true);
-    setComparisonResults([]);
-
     try {
+      // Validate comparison settings
+      const validatedSettings = validateData(comparisonSettingsSchema, settings, 'Comparison settings');
+      
+      const completeFiles = supplierFiles.filter(f => f.status === 'complete' && f.data);
+      if (completeFiles.length === 0) {
+        throw new ValidationError('Keine verarbeiteten Lieferantendateien verfügbar', {
+          totalFiles: supplierFiles.length,
+          completeFiles: completeFiles.length
+        });
+      }
+
+      setIsComparing(true);
+      setComparisonResults([]);
+
       const { data: referenceData, error } = await supabase
         .from('reference_facilities')
         .select('*, list_type')
-        .in('list_type', settings.standards)
-        .in('metal', settings.metals)
+        .in('list_type', validatedSettings.standards)
+        .in('metal', validatedSettings.metals)
         .not('standard_smelter_name', 'is', null);
 
-      if (error) throw error;
+      if (error) throw convertSupabaseError(error);
+
+      if (!referenceData || referenceData.length === 0) {
+        throw new DatabaseError('Keine Referenzdaten für die ausgewählten Standards und Metalle gefunden', {
+          standards: validatedSettings.standards,
+          metals: validatedSettings.metals
+        });
+      }
 
       // Convert to RMI format for comparison engine with standard information
-      const rmiData: RMIData[] = (referenceData || []).map(facility => ({
+      const rmiData: RMIData[] = referenceData.map(facility => ({
         facilityId: facility.smelter_id || '',
         standardFacilityName: facility.standard_smelter_name || '',
         metal: facility.metal || '',
-        assessmentStatus: `${facility.list_type}: ${facility.assessment_status || 'Conformant'}`, // Include standard in status
+        assessmentStatus: `${facility.list_type}: ${facility.assessment_status || 'Conformant'}`,
         countryLocation: facility.country_location || '',
         stateProvinceRegion: facility.state_province_region || '',
         city: facility.city || '',
         smelterReference: facility.smelter_reference || ''
       }));
 
-      const engine = createComparisonEngine(rmiData, settings.standards, settings.metals);
-      const allResults: ComparisonResult[] = [];
-      
-      for (const supplierFile of completeFiles) {
-        if (supplierFile.data) {
-          const filteredData = supplierFile.data.filter(item => 
-            settings.metals.includes(item.metal)
-          );
+      try {
+        const engine = createComparisonEngine(rmiData, validatedSettings.standards, validatedSettings.metals);
+        const allResults: ComparisonResult[] = [];
+        
+        for (const supplierFile of completeFiles) {
+          if (supplierFile.data) {
+            const filteredData = supplierFile.data.filter(item => 
+              validatedSettings.metals.includes(item.metal)
+            );
 
-          const supplierName = supplierFile.supplierName || supplierFile.name.replace(/\.(xlsx|xls|csv)$/i, '');
-          const results = engine.compareSupplierData(supplierName, filteredData);
-          allResults.push(...results);
+            if (filteredData.length === 0) {
+              console.warn(`No matching metals found in file ${supplierFile.name}`);
+              continue;
+            }
+
+            const supplierName = supplierFile.supplierName || supplierFile.name.replace(/\.(xlsx|xls|csv)$/i, '');
+            const results = engine.compareSupplierData(supplierName, filteredData);
+            allResults.push(...results);
+          }
+        }
+
+        if (allResults.length === 0) {
+          throw new ComparisonError('Keine Vergleichsergebnisse generiert', {
+            fileCount: completeFiles.length,
+            settings: validatedSettings
+          });
+        }
+
+        const summary = engine.getComparisonSummary(allResults);
+        setComparisonResults(allResults);
+        setComparisonSummary(summary);
+
+        showSuccessToast(
+          "Abgleich erfolgreich abgeschlossen",
+          `${allResults.length} Schmelzereien geprüft | Standards: ${validatedSettings.standards.join(', ')} | Metalle: ${validatedSettings.metals.join(', ')}`
+        );
+      } catch (error) {
+        if (error instanceof ComparisonError) {
+          throw error;
+        } else {
+          throw new ComparisonError(
+            'Fehler beim Ausführen der Vergleichslogik',
+            { originalError: error instanceof Error ? error.message : error }
+          );
         }
       }
-
-      const summary = engine.getComparisonSummary(allResults);
-      setComparisonResults(allResults);
-      setComparisonSummary(summary);
-
-      toast({
-        title: "Abgleich abgeschlossen",
-        description: `${allResults.length} Schmelzereien geprüft | Standards: ${settings.standards.join(', ')} | Metalle: ${settings.metals.join(', ')}`,
-      });
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler aufgetreten';
-      toast({
-        variant: "destructive",
-        title: "Abgleich fehlgeschlagen",
-        description: errorMessage,
-      });
+      if (isExcelMinerError(error)) {
+        showErrorToast(error);
+      } else {
+        showErrorToast(new ComparisonError(
+          error instanceof Error ? error.message : 'Unbekannter Abgleichsfehler',
+          { originalError: error }
+        ));
+      }
     } finally {
       setIsComparing(false);
     }
@@ -420,10 +544,7 @@ const Index = () => {
     setSupplierFiles([]);
     setComparisonResults([]);
     setComparisonSummary(undefined);
-    toast({
-      title: "Dateien gelöscht",
-      description: "Alle hochgeladenen Dateien wurden entfernt.",
-    });
+    showSuccessToast("Dateien gelöscht", "Alle hochgeladenen Dateien wurden entfernt.");
   };
 
   const removeFile = (fileId: string) => {
@@ -435,25 +556,40 @@ const Index = () => {
   };
 
   const handleStandardChange = (standard: string, checked: boolean) => {
-    const newStandards = checked 
-      ? [...settings.standards, standard]
-      : settings.standards.filter(s => s !== standard);
-    
-    setSettings({
-      ...settings,
-      standards: newStandards
-    });
+    try {
+      const newStandards = checked 
+        ? [...settings.standards, standard]
+        : settings.standards.filter(s => s !== standard);
+      
+      const newSettings = {
+        ...settings,
+        standards: newStandards
+      };
+      
+      // Validate settings before applying
+      validateData(comparisonSettingsSchema.pick({ standards: true }), { standards: newStandards }, 'Standards selection');
+      setSettings(newSettings);
+    } catch (error) {
+      showErrorToast(new ValidationError('Ungültige Auswahl der Standards', { selectedStandard: standard, currentStandards: settings.standards }));
+    }
   };
 
   const handleMetalChange = (metal: string, checked: boolean) => {
-    const newMetals = checked
-      ? [...settings.metals, metal]
-      : settings.metals.filter(m => m !== metal);
-    
-    setSettings({
-      ...settings,
-      metals: newMetals
-    });
+    try {
+      const newMetals = checked
+        ? [...settings.metals, metal]
+        : settings.metals.filter(m => m !== metal);
+      
+      const newSettings = {
+        ...settings,
+        metals: newMetals
+      };
+      
+      // Don't validate empty metals during interaction, only during comparison
+      setSettings(newSettings);
+    } catch (error) {
+      showErrorToast(new ValidationError('Ungültige Auswahl der Metalle', { selectedMetal: metal, currentMetals: settings.metals }));
+    }
   };
 
   const selectAllMetals = () => {
