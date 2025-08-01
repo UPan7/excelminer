@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertTriangle, Settings } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertTriangle, Settings, Shield } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
+import ProgressTracker from '@/components/ProgressTracker';
+import SecurityValidationForm from '@/components/SecurityValidationForm';
 import { 
   FileParsingError, 
   ValidationError, 
@@ -36,6 +38,19 @@ import {
   validateFileType,
   withErrorHandling 
 } from '@/utils/errorHandling';
+import {
+  validateUploadedFile,
+  uploadFileWithProgress,
+  sanitizeFileName,
+  type UploadProgress,
+  type ProgressCallback
+} from '@/utils/fileSecurityUtils';
+import {
+  SecureDatabase,
+  validateDatabaseInput,
+  securityAudit
+} from '@/utils/databaseSecurity';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SupplierFileData {
   id: string;
@@ -82,26 +97,18 @@ const Index = () => {
   });
   const [availableMetals, setAvailableMetals] = useState<string[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | undefined>(undefined);
+  const [uploadProgress, setUploadProgress] = useState<Map<string, UploadProgress>>(new Map());
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadDatabaseStatus();
   }, []);
 
   const loadDatabaseStatus = withErrorHandling(async () => {
-    const { data: statsData, error: statsError } = await supabase
-      .rpc('get_reference_stats');
-
-    if (statsError) throw convertSupabaseError(statsError);
-
-    // Get unique metals from database efficiently
-    const { data: metalData, error: metalError } = await supabase
-      .from('reference_facilities')
-      .select('metal', { count: 'exact' })
-      .not('metal', 'is', null)
-      .order('metal');
-
-    if (metalError) throw convertSupabaseError(metalError);
+    // Use secure database operations
+    const statsData = await SecureDatabase.fetchDatabaseStats();
+    const metalData = await SecureDatabase.fetchAvailableMetals();
 
     const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(Boolean))].sort();
     setAvailableMetals(uniqueMetals);
@@ -316,31 +323,124 @@ const Index = () => {
     });
   };
 
-  const processSupplierFile = async (fileData: SupplierFileData, file: File) => {
+  const processSupplierFileSecure = async (fileData: SupplierFileData, content: ArrayBuffer | string, sanitizedName: string) => {
     setSupplierFiles(prev => prev.map(f => 
       f.id === fileData.id ? { ...f, status: 'processing' } : f
     ));
 
     try {
-      const result = await parseSupplierFile(file);
+      const isCSV = sanitizedName.toLowerCase().endsWith('.csv');
+      let jsonData: any[][];
+      let supplierName = sanitizedName.replace(/\.(xlsx|xls|csv)$/i, '');
       
-      // Validate the processed file data
-      const validatedFileData = validateData(uploadedFileSchema, {
-        ...fileData,
-        status: 'complete' as const,
-        data: result.smelterData,
-        supplierName: result.supplierName
-      }, 'Processed file data');
+      if (isCSV) {
+        const text = content as string;
+        if (!text || text.trim().length === 0) {
+          throw new FileParsingError('CSV-Datei ist leer oder konnte nicht gelesen werden', { fileName: sanitizedName });
+        }
+        jsonData = parseCSVFile(text);
+      } else {
+        const data = new Uint8Array(content as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          throw new FileParsingError('Excel-Datei enthält keine Arbeitsblätter', { fileName: sanitizedName });
+        }
+        
+        // Extract supplier name from Declaration sheet
+        if (workbook.Sheets['Declaration']) {
+          try {
+            const declarationSheet = workbook.Sheets['Declaration'];
+            const declarationData = XLSX.utils.sheet_to_json(declarationSheet, { header: 1 });
+            const companyNameRow = declarationData[7] as any[];
+            if (companyNameRow) {
+              for (let col = 3; col <= 6; col++) {
+                if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && companyNameRow[col].trim()) {
+                  supplierName = companyNameRow[col].trim();
+                  break;
+                }
+              }
+            }
+          } catch (declarationError) {
+            console.warn('Could not extract supplier name from Declaration sheet:', declarationError);
+          }
+        }
+        
+        let worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
+        if (!worksheet) {
+          throw new FileParsingError('Kein gültiges Arbeitsblatt gefunden', { fileName: sanitizedName, availableSheets: workbook.SheetNames });
+        }
+        jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      }
+      
+      if (!jsonData || jsonData.length === 0) {
+        throw new FileParsingError('Datei enthält keine Daten', { fileName: sanitizedName });
+      }
+      
+      // Parse data with validation
+      let headerRowIndex = 3;
+      if (headerRowIndex >= jsonData.length || !jsonData[headerRowIndex] || 
+          !(jsonData[headerRowIndex] as any[]).some((cell: any) => 
+            typeof cell === 'string' && cell.toLowerCase().includes('metal'))) {
+        headerRowIndex = jsonData.findIndex((row: any) => 
+          row.some((cell: any) => 
+            typeof cell === 'string' && 
+            (cell.toLowerCase().includes('metal') || cell.toLowerCase().includes('smelter'))));
+      }
+      
+      if (headerRowIndex === -1) {
+        throw new FileParsingError('Konnte keine Kopfzeile mit Metall- oder Schmelzerei-Spalten finden', { fileName: sanitizedName });
+      }
+      
+      const headers = jsonData[headerRowIndex] as string[];
+      const supplierData: CMRTData[] = [];
+      
+      for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+        const row = jsonData[i] as any[];
+        if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+          const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
+          const smelterNameIndex = headers.findIndex(h => h && 
+            (h.toLowerCase().includes('smelter look-up') || h.toLowerCase().includes('smelter name') || 
+             h.toLowerCase().includes('facility name') || h.toLowerCase().includes('refinery name')));
+          const countryIndex = headers.findIndex(h => h && h.toLowerCase().includes('country'));
+          const idIndex = headers.findIndex(h => h && 
+            (h.toLowerCase().includes('smelter identification') || h.toLowerCase().includes('identification') || 
+             h.toLowerCase().includes('facility id') || h.toLowerCase().includes('smelter id')));
+          
+          const smelterName = row[smelterNameIndex] || '';
+          const metal = row[metalIndex] || '';
+          
+          if (smelterName && smelterName.toString().trim() && metal && metal.toString().trim()) {
+            const cmrtData = {
+              metal: metal.toString().trim(),
+              smelterName: smelterName.toString().trim(),
+              smelterCountry: (row[countryIndex] || '').toString().trim(),
+              smelterIdentificationNumber: (row[idIndex] || '').toString().trim(),
+            };
+            
+            try {
+              const validatedEntry = validateData(cmrtDataSchema, cmrtData, `Row ${i + 1}`) as CMRTData;
+              supplierData.push(validatedEntry);
+            } catch (validationError) {
+              console.warn(`Skipping invalid row ${i + 1}:`, validationError);
+            }
+          }
+        }
+      }
+      
+      if (supplierData.length === 0) {
+        throw new FileParsingError('Keine gültigen Schmelzerei-Daten gefunden', { fileName: sanitizedName });
+      }
       
       setSupplierFiles(prev => prev.map(f => 
         f.id === fileData.id 
-          ? { ...f, status: 'complete', data: result.smelterData, supplierName: result.supplierName }
+          ? { ...f, status: 'complete', data: supplierData, supplierName: supplierName }
           : f
       ));
 
       showSuccessToast(
         "Lieferantendatei erfolgreich verarbeitet",
-        `${file.name} wurde geparst: ${result.smelterData.length} Schmelzereien gefunden. Lieferant: ${result.supplierName}`
+        `${sanitizedName} wurde geparst: ${supplierData.length} Schmelzereien gefunden. Lieferant: ${supplierName}`
       );
     } catch (error) {
       if (isExcelMinerError(error)) {
@@ -348,7 +448,7 @@ const Index = () => {
       } else {
         const fileError = new FileParsingError(
           error instanceof Error ? error.message : 'Unbekannter Fehler bei der Dateiverarbeitung',
-          { fileName: file.name, originalError: error }
+          { fileName: sanitizedName, originalError: error }
         );
         showErrorToast(fileError);
       }
@@ -361,22 +461,26 @@ const Index = () => {
     }
   };
 
-  const handleFileUpload = useCallback((uploadedFiles: FileList) => {
+  const handleFileUpload = useCallback(async (uploadedFiles: FileList) => {
     try {
-      // Validate each file before processing
+      // Security audit logging
+      securityAudit.logFileUploadEvent('batch_upload', 'upload_attempt', { fileCount: uploadedFiles.length });
+      
       const validFiles: File[] = [];
       const fileErrors: string[] = [];
       
-      Array.from(uploadedFiles).forEach(file => {
+      // Validate each file with comprehensive security checks
+      for (const file of Array.from(uploadedFiles)) {
         try {
-          validateFileType(file);
+          await validateUploadedFile(file, user?.id);
           validFiles.push(file);
         } catch (error) {
-          const fileName = file.name;
+          const sanitizedName = sanitizeFileName(file.name);
           const errorMsg = error instanceof Error ? error.message : 'Unbekannter Dateifehler';
-          fileErrors.push(`${fileName}: ${errorMsg}`);
+          fileErrors.push(`${sanitizedName}: ${errorMsg}`);
+          securityAudit.logFileUploadEvent(sanitizedName, 'validation_failed', { error: errorMsg });
         }
-      });
+      }
       
       if (fileErrors.length > 0) {
         showErrorToast(new ValidationError(
@@ -389,25 +493,45 @@ const Index = () => {
         return;
       }
       
-      const newFiles: SupplierFileData[] = validFiles.map(file => ({
-        id: `${Date.now()}-${Math.random()}`,
-        name: file.name,
-        status: 'pending',
-        size: file.size,
-      }));
+      // Create file entries with progress tracking
+      const newFiles: SupplierFileData[] = validFiles.map(file => {
+        const sanitizedName = sanitizeFileName(file.name);
+        return {
+          id: `${Date.now()}-${Math.random()}`,
+          name: sanitizedName,
+          status: 'pending',
+          size: file.size,
+        };
+      });
 
       setSupplierFiles(prev => [...prev, ...newFiles]);
 
-      validFiles.forEach((file, index) => {
-        processSupplierFile(newFiles[index], file);
+      // Process each file with progress tracking
+      validFiles.forEach(async (file, index) => {
+        const fileData = newFiles[index];
+        const progressCallback: ProgressCallback = (progress) => {
+          setUploadProgress(prev => new Map(prev.set(fileData.id, progress)));
+        };
+        
+        try {
+          const { sanitizedName, content } = await uploadFileWithProgress(file, progressCallback, user?.id);
+          await processSupplierFileSecure(fileData, content, sanitizedName);
+        } catch (error) {
+          securityAudit.logFileUploadEvent(fileData.name, 'processing_failed', { error: error instanceof Error ? error.message : 'Unknown' });
+          setSupplierFiles(prev => prev.map(f => 
+            f.id === fileData.id 
+              ? { ...f, status: 'error', error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+              : f
+          ));
+        }
       });
     } catch (error) {
       showErrorToast(new ValidationError(
-        'Fehler beim Hochladen der Dateien',
+        'Fehler beim sicheren Hochladen der Dateien',
         { originalError: error }
       ));
     }
-  }, []);
+  }, [user?.id]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
