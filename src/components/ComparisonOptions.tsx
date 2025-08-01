@@ -235,7 +235,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
                   onClick={selectAllMetals}
                   disabled={settings.metals.length === AVAILABLE_METALS.length}
                 >
-                  Выбрать все
+                  Alle auswählen
                 </Button>
                 <Button 
                   variant="outline" 
@@ -243,7 +243,7 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
                   onClick={deselectAllMetals}
                   disabled={settings.metals.length === 0}
                 >
-                  Снять все
+                  Alle abwählen
                 </Button>
               </div>
             </div>
