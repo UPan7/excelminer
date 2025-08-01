@@ -98,7 +98,7 @@ export class SecureDatabase {
   }
   
   /**
-   * Executes a secure query with automatic error handling and sanitization
+   * Executes a secure query with automatic error handling and conversion
    */
   static async executeQuery<T>(
     operation: string,
