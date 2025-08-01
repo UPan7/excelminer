@@ -1,4 +1,6 @@
 import Fuse from 'fuse.js';
+import { ComparisonError, FileParsingError } from '@/types/errors';
+import { validateData, cmrtDataSchema, rmiDataSchema } from '@/schemas/validationSchemas';
 
 export interface CMRTData {
   metal: string;
@@ -58,9 +60,14 @@ export class ComparisonEngine {
   private metalsChecked: string[];
 
   constructor(rmiData: RMIData[], standardsUsed: string[] = [], metalsChecked: string[] = []) {
-    this.rmiData = rmiData;
-    this.standardsUsed = standardsUsed;
-    this.metalsChecked = metalsChecked;
+    try {
+      // Validate input data
+      this.rmiData = validateData(rmiDataSchema.array(), rmiData, 'RMI data initialization');
+      this.standardsUsed = standardsUsed;
+      this.metalsChecked = metalsChecked;
+    } catch (error) {
+      throw new ComparisonError('Fehler beim Initialisieren der Vergleichsengine', { error: error instanceof Error ? error.message : error });
+    }
     
     // Configure fuzzy search for facility names
     this.facilitySearchEngine = new Fuse(rmiData, {
