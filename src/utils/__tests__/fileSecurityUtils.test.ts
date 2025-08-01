@@ -114,6 +114,7 @@ describe('sanitizeFileName', () => {
       const longName = 'a'.repeat(300);
       const result = sanitizeFileName(longName);
       expect(result.length).toBeLessThanOrEqual(255);
+      expect(result).not.toBe('');
     });
   });
 
