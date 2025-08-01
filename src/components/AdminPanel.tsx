@@ -95,8 +95,11 @@ export function AdminPanel() {
     
     setInviting(true);
     try {
-      const { error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail, {
-        redirectTo: `${window.location.origin}/auth`
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { email: inviteEmail },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
       });
       
       if (error) throw error;
