@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Home, CheckCircle, AlertTriangle, User, LogOut, Shield } from 'lucide-react';
+import { Database, Home, CheckCircle, AlertTriangle, User, LogOut, Shield, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -78,6 +78,21 @@ const Navigation: React.FC<NavigationProps> = ({ referenceDataStatus }) => {
                 >
                   <Shield className="h-4 w-4" />
                   Admin
+                </Button>
+              </Link>
+            )}
+            
+            {userRole === 'admin' && (
+              <Link to="/audit-logs">
+                <Button 
+                  variant={isActive('/audit-logs') ? 'default' : 'ghost'}
+                  className={cn(
+                    "flex items-center gap-2",
+                    isActive('/audit-logs') && "bg-primary text-primary-foreground"
+                  )}
+                >
+                  <FileText className="h-4 w-4" />
+                  Audit Logs
                 </Button>
               </Link>
             )}
