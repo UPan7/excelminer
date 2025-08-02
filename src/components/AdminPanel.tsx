@@ -26,6 +26,7 @@ export function AdminPanel() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('user');
   const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
@@ -105,7 +106,7 @@ export function AdminPanel() {
       if (error) throw error;
       
       // Log user invitation
-      await auditLogger.logUserInvitation(inviteEmail, 'viewer');
+      await auditLogger.logUserInvitation(inviteEmail, inviteRole);
       
       setInviteEmail('');
       toast({
@@ -182,16 +183,28 @@ export function AdminPanel() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="E-Mail-Adresse"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  type="email"
-                />
-                <Button onClick={inviteUser} disabled={inviting}>
-                  {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Einladen'}
-                </Button>
+              <div className="space-y-4">
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="E-Mail-Adresse"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    type="email"
+                    className="flex-1"
+                  />
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={inviteUser} disabled={inviting}>
+                    {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Einladen'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

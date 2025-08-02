@@ -72,6 +72,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (error) {
       console.error('Error inviting user:', error);
+      
+      // Handle specific error cases
+      if (error.message.includes('email_exists') || error.message.includes('already been registered')) {
+        return new Response(
+          JSON.stringify({ error: 'Ein Benutzer mit dieser E-Mail-Adresse ist bereits registriert' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
