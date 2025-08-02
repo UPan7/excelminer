@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, Shield } from 'lucide-react';
+import { Loader2, UserPlus, Shield, Trash2 } from 'lucide-react';
 import { auditLogger } from '@/utils/auditLogger';
 import Navigation from '@/components/Navigation';
 
@@ -28,6 +28,7 @@ export function AdminPanel() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('user');
   const [inviting, setInviting] = useState(false);
+  const [deletingUsers, setDeletingUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (userRole === 'admin') {
@@ -122,6 +123,53 @@ export function AdminPanel() {
       });
     } finally {
       setInviting(false);
+    }
+  };
+
+  const deleteUser = async (userId: string, userEmail: string) => {
+    if (!confirm(`Möchten Sie den Benutzer ${userEmail} wirklich löschen?`)) {
+      return;
+    }
+
+    setDeletingUsers(prev => new Set(prev).add(userId));
+    try {
+      // Delete from profiles table first
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (profileError) throw profileError;
+
+      // Delete from auth.users using admin API
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) throw authError;
+
+      // Log user deletion
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await auditLogger.logUserDeletion(userEmail, currentUser.id);
+      }
+
+      await fetchUsers();
+      toast({
+        title: "Erfolg",
+        description: "Benutzer wurde gelöscht"
+      });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Fehler",
+        description: "Benutzer konnte nicht gelöscht werden",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
     }
   };
 
@@ -221,36 +269,51 @@ export function AdminPanel() {
                     <TableHead>Rolle</TableHead>
                     <TableHead>Erstellt am</TableHead>
                     <TableHead>Aktionen</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.user_id}>
                       <TableCell>{user.email || 'Nicht verfügbar'}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={user.role}
-                          onValueChange={(value) => updateUserRole(user.user_id, value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="user">User</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(user.created_at).toLocaleDateString('de-DE')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                          {user.role === 'admin' ? 'Administrator' : 'Benutzer'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        <TableCell>
+                          <Select
+                            value={user.role}
+                            onValueChange={(value) => updateUserRole(user.user_id, value)}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="user">User</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(user.created_at).toLocaleDateString('de-DE')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                            {user.role === 'admin' ? 'Administrator' : 'Benutzer'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteUser(user.user_id, user.email || 'Unbekannt')}
+                            disabled={deletingUsers.has(user.user_id)}
+                          >
+                            {deletingUsers.has(user.user_id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>

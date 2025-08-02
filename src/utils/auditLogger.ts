@@ -119,6 +119,14 @@ class AuditLogger {
     });
   }
 
+  async logUserDeletion(email: string, adminUserId: string) {
+    await this.log({
+      action_type: 'user_deleted',
+      resource_type: 'user',
+      details: { email, adminUserId, timestamp: new Date().toISOString() }
+    });
+  }
+
   async logSecurityEvent(eventType: string, details: Record<string, any>) {
     await this.log({
       action_type: 'security_event',
