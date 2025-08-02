@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [authError, setAuthError] = useState<Error | null>(null);
   const [isInviteMode, setIsInviteMode] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const isInviteModeRef = useRef(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -56,6 +57,11 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
       confirmPassword: "",
     },
   });
+
+  // Update ref whenever isInviteMode changes
+  useEffect(() => {
+    isInviteModeRef.current = isInviteMode;
+  }, [isInviteMode]);
 
   useEffect(() => {
     // Check for invitation parameters in URL
@@ -93,6 +99,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
+          // Skip automatic redirection if in invite mode
+          if (isInviteModeRef.current) {
+            return;
+          }
           handleAuthSuccess(session.user, session);
         }
         if (event === 'SIGNED_OUT') {
