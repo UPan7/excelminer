@@ -53,10 +53,18 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Parse request body
-    const { email } = await req.json();
+    const { email, role = 'user' } = await req.json();
     if (!email) {
       return new Response(
         JSON.stringify({ error: 'Email is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate role
+    if (!['user', 'admin'].includes(role)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid role specified' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -88,11 +96,31 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('User invited successfully:', email);
+
+    // If role is not 'user', update the profile after invitation
+    if (role !== 'user' && data.user) {
+      try {
+        const { error: roleError } = await adminClient
+          .from('profiles')
+          .update({ role })
+          .eq('user_id', data.user.id);
+
+        if (roleError) {
+          console.error('Error setting user role:', roleError);
+          // Don't fail the invitation if role setting fails
+        } else {
+          console.log(`User role set to ${role} for:`, email);
+        }
+      } catch (roleError) {
+        console.error('Error updating user role:', roleError);
+      }
+    }
     
     return new Response(
       JSON.stringify({ 
         message: 'Invitation sent successfully',
-        user: data.user 
+        user: data.user,
+        role: role
       }),
       {
         status: 200,
