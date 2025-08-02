@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Download, Shield, Calendar, User, File } from 'lucide-react';
+import Navigation from '@/components/Navigation';
 import type { AuditLog } from '@/types/audit';
 
 export function AuditLogViewer() {
@@ -156,19 +157,24 @@ export function AuditLogViewer() {
 
   if (userRole !== 'admin') {
     return (
-      <Card className="max-w-md mx-auto mt-8">
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground">
-            <Shield className="h-12 w-12 mx-auto mb-4" />
-            <p>Zugriff verweigert. Administratorrechte erforderlich.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div>
+        <Navigation />
+        <Card className="max-w-md mx-auto mt-8">
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">
+              <Shield className="h-12 w-12 mx-auto mb-4" />
+              <p>Zugriff verweigert. Administratorrechte erforderlich.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div>
+      <Navigation />
+      <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Shield className="h-6 w-6" />
@@ -345,6 +351,7 @@ export function AuditLogViewer() {
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }
