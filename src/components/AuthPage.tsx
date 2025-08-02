@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorDisplay } from "@/components/ErrorDisplay";
 import { AuthenticationError, isExcelMinerError } from "@/types/errors";
-import { authFormSchema } from "@/schemas/validationSchemas";
+import { authFormSchema, passwordSetupSchema } from "@/schemas/validationSchemas";
 import { showErrorToast, showSuccessToast, convertSupabaseError } from "@/utils/errorHandling";
 import { auditLogger } from "@/utils/auditLogger";
 
@@ -26,10 +26,18 @@ type AuthFormData = {
   password: string;
 };
 
+type PasswordSetupData = {
+  password: string;
+  confirmPassword: string;
+};
+
 export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
+  const [isInviteMode, setIsInviteMode] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -41,7 +49,28 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     },
   });
 
+  const passwordForm = useForm<PasswordSetupData>({
+    resolver: zodResolver(passwordSetupSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
   useEffect(() => {
+    // Check for invitation parameters in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenHash = urlParams.get('token_hash');
+    const type = urlParams.get('type');
+    
+    if (tokenHash && type === 'invite') {
+      setIsInviteMode(true);
+      setInviteToken(tokenHash);
+      // Clear URL params after extraction
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return; // Don't check session if we're in invite mode
+    }
+
     const checkSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -131,6 +160,60 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     }
   };
 
+  const handlePasswordSetup = async (data: PasswordSetupData) => {
+    if (!inviteToken) {
+      setAuthError(new AuthenticationError('Einladungstoken fehlt'));
+      return;
+    }
+
+    setIsLoading(true);
+    setAuthError(null);
+
+    try {
+      const { data: authData, error } = await supabase.auth.verifyOtp({
+        token_hash: inviteToken,
+        type: 'invite',
+      });
+
+      if (error) {
+        if (error.message.includes('Token has expired')) {
+          throw new AuthenticationError('Einladungslink ist abgelaufen. Bitte um eine neue Einladung.');
+        } else if (error.message.includes('Invalid token')) {
+          throw new AuthenticationError('Ungültiger Einladungslink.');
+        } else {
+          throw convertSupabaseError(error);
+        }
+      }
+
+      // Set the password for the user
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: data.password
+      });
+
+      if (updateError) {
+        throw convertSupabaseError(updateError);
+      }
+
+      if (authData.user && authData.session) {
+        showSuccessToast("Passwort erfolgreich eingerichtet!", "Sie können sich jetzt anmelden.");
+        handleAuthSuccess(authData.user, authData.session);
+      }
+    } catch (error) {
+      if (isExcelMinerError(error)) {
+        setAuthError(error);
+        showErrorToast(error);
+      } else {
+        const authError = new AuthenticationError(
+          'Ein Fehler beim Einrichten des Passworts ist aufgetreten. Bitte versuchen Sie es erneut.'
+        );
+        setAuthError(authError);
+        showErrorToast(authError);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background p-4">
@@ -145,7 +228,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             </div>
             <CardTitle className="text-2xl font-bold">ExcelMiner</CardTitle>
             <CardDescription>
-              Anmelden für Zugriff auf die Anwendung
+              {isInviteMode ? "Passwort für Ihr Konto einrichten" : "Anmelden für Zugriff auf die Anwendung"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -157,64 +240,140 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
               />
             )}
             
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSignIn)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-Mail</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="E-Mail eingeben"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Passwort</FormLabel>
-                      <FormControl>
-                        <div className="relative">
+            {isInviteMode ? (
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(handlePasswordSetup)} className="space-y-4">
+                  <FormField
+                    control={passwordForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Neues Passwort</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Passwort eingeben"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Passwort bestätigen</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="Passwort wiederholen"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Passwort einrichten..." : "Passwort einrichten"}
+                  </Button>
+                </form>
+              </Form>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSignIn)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-Mail</FormLabel>
+                        <FormControl>
                           <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Passwort eingeben"
+                            type="email"
+                            placeholder="E-Mail eingeben"
                             {...field}
                           />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Anmelden..." : "Anmelden"}
-                </Button>
-              </form>
-            </Form>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Passwort</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Passwort eingeben"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Anmelden..." : "Anmelden"}
+                  </Button>
+                </form>
+              </Form>
+            )}
           </CardContent>
         </Card>
       </div>

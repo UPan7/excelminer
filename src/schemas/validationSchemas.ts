@@ -46,6 +46,15 @@ export const authFormSchema = z.object({
   password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen lang sein'),
 });
 
+// Password setup validation schema for invited users
+export const passwordSetupSchema = z.object({
+  password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen lang sein'),
+  confirmPassword: z.string().min(6, 'Passwort-Bestätigung ist erforderlich'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwörter stimmen nicht überein",
+  path: ["confirmPassword"],
+});
+
 // API response validation schemas
 export const supabaseErrorSchema = z.object({
   message: z.string(),
