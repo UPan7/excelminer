@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .from('profiles')
                 .select('role')
                 .eq('user_id', session.user.id)
-                .single();
+                .maybeSingle();
               
               setUserRole(profile?.role || 'viewer');
               
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .from('profiles')
               .select('role')
               .eq('user_id', session.user.id)
-              .single();
+              .maybeSingle();
             
             setUserRole(profile?.role || 'viewer');
           } catch (error) {
