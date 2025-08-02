@@ -136,8 +136,8 @@ describe('sanitizeFileName', () => {
     });
 
     it('sollte mit null und undefined umgehen können', () => {
-      const result1 = sanitizeFileName(null as any);
-      const result2 = sanitizeFileName(undefined as any);
+      const result1 = sanitizeFileName(null as unknown as string);
+      const result2 = sanitizeFileName(undefined as unknown as string);
       expect(result1).toMatch(/^upload_\d+$/);
       expect(result2).toMatch(/^upload_\d+$/);
     });
