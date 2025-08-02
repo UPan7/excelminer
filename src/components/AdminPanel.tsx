@@ -141,10 +141,12 @@ export function AdminPanel() {
 
       if (profileError) throw profileError;
 
-      // Delete from auth.users using admin API
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      // Call edge function to delete from auth.users
+      const { error: functionError } = await supabase.functions.invoke('delete-user', {
+        body: { userId }
+      });
       
-      if (authError) throw authError;
+      if (functionError) throw functionError;
 
       // Log user deletion
       const { data: { user: currentUser } } = await supabase.auth.getUser();
