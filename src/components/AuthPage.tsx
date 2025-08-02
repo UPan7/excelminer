@@ -64,10 +64,23 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   }, [isInviteMode]);
 
   useEffect(() => {
-    // Check for invitation parameters in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenHash = urlParams.get('token_hash');
-    const type = urlParams.get('type');
+    // Check for invitation parameters in URL (both hash and search params)
+    let tokenHash = null;
+    let type = null;
+    
+    // First try to get from hash (Supabase auth redirects put params here)
+    if (window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      tokenHash = hashParams.get('token_hash');
+      type = hashParams.get('type');
+    }
+    
+    // Fallback to search params if not found in hash
+    if (!tokenHash) {
+      const urlParams = new URLSearchParams(window.location.search);
+      tokenHash = urlParams.get('token_hash');
+      type = urlParams.get('type');
+    }
     
     if (tokenHash && type === 'invite') {
       setIsInviteMode(true);
