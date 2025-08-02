@@ -39,10 +39,6 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
     details: []
   });
 
-  useEffect(() => {
-    loadDatabaseStatus();
-  }, []);
-
   const loadDatabaseStatus = async () => {
     try {
       // Load reference lists metadata
@@ -59,16 +55,26 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
 
       if (statsError) throw statsError;
 
-      const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
+      interface StatsData {
+        total_facilities: number;
+        list_type: string;
+      }
+      
+      interface ListData {
+        type: string;
+        updated_at: string;
+      }
+
+      const totalRecords = (statsData || []).reduce((sum: number, stat: StatsData) => sum + (stat.total_facilities || 0), 0);
       const isReady = (lists || []).length > 0 && totalRecords > 0;
-      const lastUpdated = (lists || []).reduce((latest: string | undefined, list: any) => {
+      const lastUpdated = (lists || []).reduce((latest: string | undefined, list: ListData) => {
         if (!latest || list.updated_at > latest) return list.updated_at;
         return latest;
       }, undefined);
 
       const details = AVAILABLE_STANDARDS.map(type => {
-        const list = (lists || []).find((l: any) => l.type === type);
-        const stat = (statsData || []).find((s: any) => s.list_type === type);
+        const list = (lists || []).find((l: ListData) => l.type === type);
+        const stat = (statsData || []).find((s: StatsData) => s.list_type === type);
         return {
           type,
           count: stat?.total_facilities || 0,
@@ -86,6 +92,11 @@ const ComparisonOptions: React.FC<ComparisonOptionsProps> = ({ onSettingsChange,
       console.error('Error loading database status:', error);
     }
   };
+
+  useEffect(() => {
+    loadDatabaseStatus();
+  }, []);
+
 
   const handleStandardChange = (standard: string, checked: boolean) => {
     const newStandards = checked 

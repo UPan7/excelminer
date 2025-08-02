@@ -34,7 +34,7 @@ class AuditLogger {
         action_type: params.action_type,
         resource_type: params.resource_type || null,
         resource_id: params.resource_id || null,
-        details: params.details || {},
+        details: JSON.parse(JSON.stringify(params.details || {})), // Ensure JSON serializable
         status: params.status || 'success',
         error_message: params.error_message || null,
         ...clientInfo
@@ -57,7 +57,7 @@ class AuditLogger {
   }
 
   // Convenience methods for common audit events
-  async logUserLogin(userId: string, details?: Record<string, any>) {
+  async logUserLogin(userId: string, details?: Record<string, unknown>) {
     await this.log({
       action_type: 'user_login',
       resource_type: 'user',
@@ -84,7 +84,7 @@ class AuditLogger {
     });
   }
 
-  async logFileUpload(fileName: string, fileSize: number, details?: Record<string, any>) {
+  async logFileUpload(fileName: string, fileSize: number, details?: Record<string, unknown>) {
     await this.log({
       action_type: 'file_uploaded',
       resource_type: 'file',
@@ -93,7 +93,7 @@ class AuditLogger {
     });
   }
 
-  async logComparison(comparisonId: string, details: Record<string, any>) {
+  async logComparison(comparisonId: string, details: Record<string, unknown>) {
     await this.log({
       action_type: 'comparison_performed',
       resource_type: 'comparison',
@@ -127,7 +127,7 @@ class AuditLogger {
     });
   }
 
-  async logSecurityEvent(eventType: string, details: Record<string, any>) {
+  async logSecurityEvent(eventType: string, details: Record<string, unknown>) {
     await this.log({
       action_type: 'security_event',
       details: { eventType, ...details },

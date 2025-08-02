@@ -100,7 +100,7 @@ export const ComparisonResults: React.FC<ComparisonResultsProps> = ({
 
   // Filter and sort results
   const filteredAndSortedResults = useMemo(() => {
-    let filtered = results.filter(result => {
+    const filtered = results.filter(result => {
       const matchesSearch = searchTerm === '' || 
         result.smelterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.country.toLowerCase().includes(searchTerm.toLowerCase()) ||

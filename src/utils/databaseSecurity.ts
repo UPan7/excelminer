@@ -16,7 +16,7 @@ export const sanitizeString = (input: string): string => {
   
   // Remove potential SQL injection patterns and control characters
   return input
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Control characters
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '') // Control characters
     .replace(/[;'"\\]/g, '') // Basic SQL injection characters
     .trim()
     .substring(0, 1000); // Limit length

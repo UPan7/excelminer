@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.removeEventListener(event, resetTimeoutOnActivity, true);
       });
     };
-  }, []);
+  }, [session?.user, user]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

@@ -232,7 +232,7 @@ export class ComparisonEngine {
       const resultId = `${supplierName}-${index}`;
       
       // Start with attention-required status
-      let result: ComparisonResult = {
+      const result: ComparisonResult = {
         id: resultId,
         supplierName,
         smelterName: smelter.smelterName,

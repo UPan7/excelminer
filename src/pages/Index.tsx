@@ -101,28 +101,27 @@ const Index = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  useEffect(() => {
-    loadDatabaseStatus();
-  }, []);
-
   const loadDatabaseStatus = withErrorHandling(async () => {
     // Use secure database operations
     const statsData = await SecureDatabase.fetchDatabaseStats();
     const metalData = await SecureDatabase.fetchAvailableMetals();
 
-    const uniqueMetals = [...new Set(metalData.map(item => item.metal).filter(Boolean))].sort();
+    const uniqueMetals = [...new Set(metalData.map((item: { metal: string }) => item.metal).filter(Boolean))].sort();
     setAvailableMetals(uniqueMetals);
 
-    const totalRecords = (statsData || []).reduce((sum: number, stat: any) => sum + (stat.total_facilities || 0), 0);
+    interface StatData {
+      total_facilities: number;
+      list_type: string;
+    }
+
+    const totalRecords = (statsData || []).reduce((sum: number, stat: StatData) => sum + (stat.total_facilities || 0), 0);
     const isReady = totalRecords > 0;
 
     const details = AVAILABLE_STANDARDS.map(type => {
-      const stat = (statsData || []).find((s: any) => s.list_type === type);
+      const stat = (statsData || []).find((s: StatData) => s.list_type === type);
       return {
         type,
-        count: stat?.total_facilities || 0,
-        lastUpdated: stat?.last_updated,
-        metalCounts: (stat?.metal_counts || {}) as { [metal: string]: number }
+        count: stat?.total_facilities || 0
       };
     });
 
@@ -131,9 +130,12 @@ const Index = () => {
       totalRecords,
       details
     });
+  }, 'loading database status');
 
-    showSuccessToast('Datenbank-Status aktualisiert', `${totalRecords} Datensätze verfügbar`);
-  }, 'Database status loading');
+  useEffect(() => {
+    loadDatabaseStatus();
+  }, []);
+
 
   const parseCSVFile = (text: string): string[][] => {
     const lines = text.split('\n');
@@ -176,7 +178,7 @@ const Index = () => {
       
       reader.onload = (e) => {
         try {
-          let jsonData: any[][];
+          let jsonData: unknown[][];
           let supplierName = file.name.replace(/\.(xlsx|xls|csv)$/i, '');
           
           if (isCSV) {
@@ -200,12 +202,12 @@ const Index = () => {
                 const declarationData = XLSX.utils.sheet_to_json(declarationSheet, { header: 1 });
                 
                 // Look for company name in D8 (or merged range D8:G8)
-                const companyNameRow = declarationData[7] as any[]; // Row 8 (0-indexed)
+                const companyNameRow = declarationData[7] as unknown[]; // Row 8 (0-indexed)
                 if (companyNameRow) {
                   // Check cells D8, E8, F8, G8 (columns 3, 4, 5, 6)
                   for (let col = 3; col <= 6; col++) {
-                    if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && companyNameRow[col].trim()) {
-                      supplierName = companyNameRow[col].trim();
+                if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && (companyNameRow[col] as string).trim()) {
+                      supplierName = (companyNameRow[col] as string).trim();
                       break;
                     }
                   }
@@ -215,7 +217,7 @@ const Index = () => {
               }
             }
             
-            let worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
+            const worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
             if (!worksheet) {
               throw new FileParsingError('Kein gültiges Arbeitsblatt gefunden', { fileName: file.name, availableSheets: workbook.SheetNames });
             }
@@ -230,11 +232,11 @@ const Index = () => {
           
           if (headerRowIndex >= jsonData.length || 
               !jsonData[headerRowIndex] || 
-              !(jsonData[headerRowIndex] as any[]).some((cell: any) => 
+              !(jsonData[headerRowIndex] as unknown[]).some((cell: unknown) => 
                 typeof cell === 'string' && cell.toLowerCase().includes('metal')
               )) {
-            headerRowIndex = jsonData.findIndex((row: any) => 
-              row.some((cell: any) => 
+            headerRowIndex = jsonData.findIndex((row: unknown) => 
+              Array.isArray(row) && row.some((cell: unknown) => 
                 typeof cell === 'string' && 
                 (cell.toLowerCase().includes('metal') || 
                  cell.toLowerCase().includes('smelter'))
@@ -352,11 +354,11 @@ const Index = () => {
           try {
             const declarationSheet = workbook.Sheets['Declaration'];
             const declarationData = XLSX.utils.sheet_to_json(declarationSheet, { header: 1 });
-            const companyNameRow = declarationData[7] as any[];
+            const companyNameRow = declarationData[7] as unknown[];
             if (companyNameRow) {
               for (let col = 3; col <= 6; col++) {
-                if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && companyNameRow[col].trim()) {
-                  supplierName = companyNameRow[col].trim();
+                if (companyNameRow[col] && typeof companyNameRow[col] === 'string' && (companyNameRow[col] as string).trim()) {
+                  supplierName = (companyNameRow[col] as string).trim();
                   break;
                 }
               }
@@ -366,7 +368,7 @@ const Index = () => {
           }
         }
         
-        let worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
+        const worksheet = workbook.Sheets['Smelter List'] || workbook.Sheets[workbook.SheetNames[0]];
         if (!worksheet) {
           throw new FileParsingError('Kein gültiges Arbeitsblatt gefunden', { fileName: sanitizedName, availableSheets: workbook.SheetNames });
         }
@@ -380,10 +382,10 @@ const Index = () => {
       // Parse data with validation
       let headerRowIndex = 3;
       if (headerRowIndex >= jsonData.length || !jsonData[headerRowIndex] || 
-          !(jsonData[headerRowIndex] as any[]).some((cell: any) => 
+          !(jsonData[headerRowIndex] as unknown[]).some((cell: unknown) => 
             typeof cell === 'string' && cell.toLowerCase().includes('metal'))) {
-        headerRowIndex = jsonData.findIndex((row: any) => 
-          row.some((cell: any) => 
+        headerRowIndex = jsonData.findIndex((row: unknown) => 
+          Array.isArray(row) && row.some((cell: unknown) => 
             typeof cell === 'string' && 
             (cell.toLowerCase().includes('metal') || cell.toLowerCase().includes('smelter'))));
       }
@@ -396,7 +398,7 @@ const Index = () => {
       const supplierData: CMRTData[] = [];
       
       for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as any[];
+        const row = jsonData[i] as unknown[];
         if (row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
           const metalIndex = headers.findIndex(h => h && h.toLowerCase().includes('metal'));
           const smelterNameIndex = headers.findIndex(h => h && 
@@ -531,7 +533,7 @@ const Index = () => {
         { originalError: error }
       ));
     }
-  }, [user?.id]);
+  }, [processSupplierFileSecure, user?.id]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

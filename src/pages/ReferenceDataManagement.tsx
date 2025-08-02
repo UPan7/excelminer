@@ -24,7 +24,7 @@ interface ReferenceList {
 interface ReferenceStats {
   list_type: string;
   total_facilities: number;
-  metal_counts: any;
+  metal_counts: Record<string, number>;
   last_updated: string;
 }
 
@@ -36,6 +36,7 @@ const ReferenceDataManagement = () => {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+
 
   useEffect(() => {
     loadReferenceData();
@@ -169,11 +170,11 @@ const ReferenceDataManagement = () => {
       const facilities = rows
         .filter(row => row && row.length > 0 && row.some(cell => cell))
         .map(row => {
-          const facility: any = { list_type: listType };
+          const facility: Record<string, unknown> = { list_type: listType };
           
           Object.entries(columnIndices).forEach(([field, index]) => {
             if (index < row.length && row[index]) {
-              let value = row[index].toString().trim();
+              const value = row[index].toString().trim();
               
               // Handle date fields with proper validation
               if (field === 'dd_assessment_date' && value) {
@@ -223,7 +224,7 @@ const ReferenceDataManagement = () => {
         const batch = filteredFacilities.slice(i, i + batchSize);
         const { error: insertError } = await supabase
           .from('reference_facilities')
-          .insert(batch);
+          .insert(batch as any);
 
         if (insertError) throw insertError;
         
