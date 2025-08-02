@@ -128,10 +128,10 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
 
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('Error in invite-user function:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: error.message }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

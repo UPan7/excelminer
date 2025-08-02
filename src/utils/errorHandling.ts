@@ -79,7 +79,7 @@ export const showWarningToast = (title: string, description?: string) => {
 };
 
 // Error handler wrapper for async functions
-export const withErrorHandling = <T extends unknown[], R>(
+export const withErrorHandling = <T extends any[], R>(
   fn: (...args: T) => Promise<R>,
   errorContext?: string
 ) => {
@@ -111,7 +111,7 @@ export const withErrorHandling = <T extends unknown[], R>(
 };
 
 // Error handler for sync functions
-export const withSyncErrorHandling = <T extends unknown[], R>(
+export const withSyncErrorHandling = <T extends any[], R>(
   fn: (...args: T) => R,
   errorContext?: string
 ) => {

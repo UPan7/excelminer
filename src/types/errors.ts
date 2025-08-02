@@ -2,9 +2,9 @@
 
 export class ExcelMinerError extends Error {
   public readonly code: string;
-  public readonly details?: Record<string, unknown>;
+  public readonly details?: Record<string, any>;
 
-  constructor(message: string, code: string, details?: Record<string, unknown>) {
+  constructor(message: string, code: string, details?: Record<string, any>) {
     super(message);
     this.name = this.constructor.name;
     this.code = code;
@@ -13,37 +13,37 @@ export class ExcelMinerError extends Error {
 }
 
 export class FileParsingError extends ExcelMinerError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(message: string, details?: Record<string, any>) {
     super(message, 'FILE_PARSING_ERROR', details);
   }
 }
 
 export class ValidationError extends ExcelMinerError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(message: string, details?: Record<string, any>) {
     super(message, 'VALIDATION_ERROR', details);
   }
 }
 
 export class DatabaseError extends ExcelMinerError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(message: string, details?: Record<string, any>) {
     super(message, 'DATABASE_ERROR', details);
   }
 }
 
 export class NetworkError extends ExcelMinerError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(message: string, details?: Record<string, any>) {
     super(message, 'NETWORK_ERROR', details);
   }
 }
 
 export class AuthenticationError extends ExcelMinerError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(message: string, details?: Record<string, any>) {
     super(message, 'AUTHENTICATION_ERROR', details);
   }
 }
 
 export class ComparisonError extends ExcelMinerError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(message: string, details?: Record<string, any>) {
     super(message, 'COMPARISON_ERROR', details);
   }
 }

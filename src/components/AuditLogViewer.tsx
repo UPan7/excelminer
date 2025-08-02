@@ -24,6 +24,14 @@ export function AuditLogViewer() {
   const [totalLogs, setTotalLogs] = useState(0);
   const logsPerPage = 50;
 
+  useEffect(() => {
+    if (userRole === 'admin') {
+      fetchLogs();
+    } else {
+      setLoading(false);
+    }
+  }, [userRole, currentPage, actionFilter, statusFilter, searchTerm]);
+
   const fetchLogs = async () => {
     try {
       setLoading(true);
@@ -64,15 +72,6 @@ export function AuditLogViewer() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (userRole === 'admin') {
-      fetchLogs();
-    } else {
-      setLoading(false);
-    }
-  }, [userRole, currentPage, actionFilter, statusFilter, searchTerm]);
-
 
   const exportLogs = async () => {
     try {
@@ -149,10 +148,8 @@ export function AuditLogViewer() {
     });
   };
 
-  const formatDetails = (details: unknown) => {
-    if (!details || typeof details !== 'object') return '';
-    const detailsObj = details as Record<string, unknown>;
-    return Object.entries(detailsObj)
+  const formatDetails = (details: Record<string, any>) => {
+    return Object.entries(details)
       .filter(([key]) => !['sensitiveData'].includes(key))
       .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
       .join(', ');

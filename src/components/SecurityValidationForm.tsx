@@ -53,8 +53,11 @@ const SecurityValidationForm: React.FC<SecurityValidationFormProps> = ({
   // Watch form changes for real-time validation
   const watchedValues = form.watch();
 
+  React.useEffect(() => {
+    validateSettings(watchedValues);
+  }, [watchedValues]);
 
-  const validateSettings = React.useCallback(async (formSettings: ComparisonSettings) => {
+  const validateSettings = async (formSettings: ComparisonSettings) => {
     try {
       // Client-side validation
       const result = comparisonSettingsSchema.safeParse(formSettings);
@@ -102,12 +105,7 @@ const SecurityValidationForm: React.FC<SecurityValidationFormProps> = ({
       setValidationStatus({ isValid: false, errors: [errorMessage] });
       showErrorToast(error instanceof Error ? error : new ValidationError(errorMessage));
     }
-  }, [availableMetals, dbStatus.details, onSettingsChange]);
-
-  React.useEffect(() => {
-    validateSettings(watchedValues);
-  }, [watchedValues, validateSettings]);
-
+  };
 
   const handleStandardChange = (standard: string, checked: boolean) => {
     const newStandards = checked 

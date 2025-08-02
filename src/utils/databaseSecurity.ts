@@ -16,7 +16,7 @@ export const sanitizeString = (input: string): string => {
   
   // Remove potential SQL injection patterns and control characters
   return input
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '') // Control characters
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Control characters
     .replace(/[;'"\\]/g, '') // Basic SQL injection characters
     .trim()
     .substring(0, 1000); // Limit length
@@ -62,18 +62,16 @@ export const sanitizeComparisonSettings = (settings: {
 /**
  * Sanitizes CMRT data for database operations
  */
-export const sanitizeCMRTData = (data: unknown): Record<string, string> => {
+export const sanitizeCMRTData = (data: any): any => {
   if (!data || typeof data !== 'object') {
     throw new ValidationError('Ungültige CMRT-Daten bereitgestellt');
   }
   
-  const dataObj = data as Record<string, unknown>;
-  
   return {
-    metal: sanitizeString(String(dataObj.metal || '')),
-    smelterName: sanitizeString(String(dataObj.smelterName || '')),
-    smelterCountry: sanitizeString(String(dataObj.smelterCountry || '')),
-    smelterIdentificationNumber: sanitizeString(String(dataObj.smelterIdentificationNumber || '')),
+    metal: sanitizeString(data.metal || ''),
+    smelterName: sanitizeString(data.smelterName || ''),
+    smelterCountry: sanitizeString(data.smelterCountry || ''),
+    smelterIdentificationNumber: sanitizeString(data.smelterIdentificationNumber || ''),
   };
 };
 
@@ -81,12 +79,12 @@ export const sanitizeCMRTData = (data: unknown): Record<string, string> => {
  * Secure database query wrapper with error handling and logging
  */
 export class SecureDatabase {
-  private static logError(operation: string, error: unknown, context?: Record<string, unknown>): void {
+  private static logError(operation: string, error: any, context?: any): void {
     // Log error without exposing sensitive data
     const errorInfo = {
       operation,
       timestamp: new Date().toISOString(),
-      errorCode: error && typeof error === 'object' && 'code' in error ? (error as { code: string }).code : 'unknown',
+      errorCode: error?.code,
       context: context ? { ...context, sensitiveData: '[REDACTED]' } : undefined
     };
     
@@ -105,7 +103,7 @@ export class SecureDatabase {
   static async executeQuery<T>(
     operation: string,
     queryFn: () => Promise<{ data: T; error: PostgrestError | null }>,
-    context?: Record<string, unknown>
+    context?: any
   ): Promise<T> {
     try {
       const { data, error } = await queryFn();
@@ -132,13 +130,13 @@ export class SecureDatabase {
   /**
    * Executes a transaction with automatic rollback on error
    */
-  static async executeTransaction(
-    operations: Array<() => Promise<unknown>>,
+  static async executeTransaction<T>(
+    operations: Array<() => Promise<any>>,
     transactionName: string
-  ): Promise<unknown[]> {
+  ): Promise<T[]> {
     // Note: Supabase doesn't support client-side transactions directly
     // We'll implement a compensation pattern for rollback
-    const results: unknown[] = [];
+    const results: any[] = [];
     const completedOperations: Array<() => Promise<void>> = [];
     
     try {
@@ -147,8 +145,8 @@ export class SecureDatabase {
         results.push(result);
         
         // Store rollback operation if available
-        if (result && typeof result === 'object' && 'rollback' in result && typeof (result as any).rollback === 'function') {
-          completedOperations.push((result as any).rollback);
+        if (result && typeof result.rollback === 'function') {
+          completedOperations.push(result.rollback);
         }
       }
       
@@ -257,29 +255,27 @@ export const validateDatabaseInput = {
   /**
    * Validates comparison settings before database queries
    */
-  comparisonSettings: (settings: unknown): void => {
+  comparisonSettings: (settings: any): void => {
     if (!settings || typeof settings !== 'object') {
       throw new ValidationError('Ungültige Vergleichseinstellungen');
     }
     
-    const settingsObj = settings as Record<string, unknown>;
-    
-    if (!Array.isArray(settingsObj.standards) || settingsObj.standards.length === 0) {
+    if (!Array.isArray(settings.standards) || settings.standards.length === 0) {
       throw new ValidationError('Standards müssen als nicht-leeres Array bereitgestellt werden');
     }
     
-    if (!Array.isArray(settingsObj.metals) || settingsObj.metals.length === 0) {
+    if (!Array.isArray(settings.metals) || settings.metals.length === 0) {
       throw new ValidationError('Metalle müssen als nicht-leeres Array bereitgestellt werden');
     }
     
     // Validate individual items
-    (settingsObj.standards as unknown[]).forEach((std: unknown, index: number) => {
+    settings.standards.forEach((std: any, index: number) => {
       if (typeof std !== 'string' || std.length === 0) {
         throw new ValidationError(`Standard bei Index ${index} ist ungültig`);
       }
     });
     
-    (settingsObj.metals as unknown[]).forEach((metal: unknown, index: number) => {
+    settings.metals.forEach((metal: any, index: number) => {
       if (typeof metal !== 'string' || metal.length === 0) {
         throw new ValidationError(`Metall bei Index ${index} ist ungültig`);
       }
@@ -289,7 +285,7 @@ export const validateDatabaseInput = {
   /**
    * Validates CMRT data array before processing
    */
-  cmrtDataArray: (data: unknown): void => {
+  cmrtDataArray: (data: any): void => {
     if (!Array.isArray(data)) {
       throw new ValidationError('CMRT-Daten müssen als Array bereitgestellt werden');
     }
@@ -302,18 +298,16 @@ export const validateDatabaseInput = {
       throw new ValidationError('CMRT-Daten-Array ist zu groß (Maximum: 10.000 Einträge)');
     }
     
-    data.forEach((item: unknown, index: number) => {
+    data.forEach((item: any, index: number) => {
       if (!item || typeof item !== 'object') {
         throw new ValidationError(`CMRT-Dateneintrag bei Index ${index} ist ungültig`);
       }
       
-      const itemObj = item as Record<string, unknown>;
-      
-      if (!itemObj.metal || typeof itemObj.metal !== 'string') {
+      if (!item.metal || typeof item.metal !== 'string') {
         throw new ValidationError(`Metall bei Index ${index} ist erforderlich und muss ein String sein`);
       }
       
-      if (!itemObj.smelterName || typeof itemObj.smelterName !== 'string') {
+      if (!item.smelterName || typeof item.smelterName !== 'string') {
         throw new ValidationError(`Schmelzerei-Name bei Index ${index} ist erforderlich und muss ein String sein`);
       }
     });
@@ -330,7 +324,7 @@ export const securityAudit = {
   /**
    * Logs security-relevant events (enhanced with database persistence)
    */
-  logEvent: (event: string, details?: Record<string, unknown>): void => {
+  logEvent: (event: string, details?: any): void => {
     const auditEntry = {
       timestamp: new Date().toISOString(),
       event,
@@ -373,12 +367,12 @@ export const securityAudit = {
   /**
    * Logs file upload security events
    */
-  logFileUploadEvent: (fileName: string, event: string, details?: Record<string, unknown>): void => {
+  logFileUploadEvent: (fileName: string, event: string, details?: any): void => {
     securityAudit.logEvent('file_upload_security', {
       fileName: fileName.substring(0, 20) + '...',
       event,
       details
     });
-    auditLogger.logFileUpload(fileName, typeof details?.fileSize === 'number' ? details.fileSize : 0, { event, ...details }).catch(console.error);
+    auditLogger.logFileUpload(fileName, details?.fileSize || 0, { event, ...details }).catch(console.error);
   }
 };

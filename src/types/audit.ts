@@ -8,7 +8,7 @@ export interface AuditLog {
   resource_id?: string | null;
   ip_address?: unknown;
   user_agent?: string | null;
-  details: unknown;
+  details: any;
   status: string;
   error_message?: string | null;
   created_at: string;
@@ -18,7 +18,7 @@ export interface CreateAuditLogParams {
   action_type: string;
   resource_type?: string;
   resource_id?: string;
-  details?: unknown;
+  details?: Record<string, any>;
   status?: 'success' | 'failure' | 'warning';
   error_message?: string;
 }

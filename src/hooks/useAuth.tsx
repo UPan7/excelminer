@@ -19,110 +19,115 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
 
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      return profile?.role || 'user';
-    } catch (error) {
-      console.error('Error fetching user role:', error);
-      return 'user';
-    }
-  };
-
   useEffect(() => {
-    let mounted = true;
-
-    // Check for existing session first
-    const initializeAuth = async () => {
-      try {
-        console.log('Initializing auth...');
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-        
-        console.log('Initial session:', session ? 'exists' : 'none');
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          console.log('Fetching user role for:', session.user.email);
-          const role = await fetchUserRole(session.user.id);
-          if (mounted) {
-            console.log('User role:', role);
-            setUserRole(role);
-          }
-        } else {
-          if (mounted) {
-            setUserRole(null);
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        if (mounted) {
-          console.log('Auth initialization complete, setting loading to false');
-          setLoading(false);
-        }
-      }
-    };
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return;
-
-        console.log('Auth state change:', event, session ? 'has session' : 'no session');
-        
         setSession(session);
         setUser(session?.user ?? null);
         
+        // Fetch user role when user signs in and log audit event
         if (session?.user) {
-          // Fetch user role
-          const role = await fetchUserRole(session.user.id);
-          if (mounted) {
-            setUserRole(role);
-            
-            // Log successful login
-            if (event === 'SIGNED_IN') {
-              setTimeout(async () => {
+          setTimeout(async () => {
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
+              
+              setUserRole(profile?.role || 'viewer');
+              
+              // Log successful login
+              if (event === 'SIGNED_IN') {
                 await auditLogger.logUserLogin(session.user.id, {
                   email: session.user.email,
-                  role
+                  role: profile?.role || 'viewer'
                 });
-              }, 0);
+              }
+            } catch (error) {
+              console.error('Error fetching user role:', error);
+              setUserRole('viewer');
             }
-          }
+          }, 0);
         } else {
-          if (mounted) {
-            setUserRole(null);
-            
-            // Log logout if this was a sign out event
-            if (event === 'SIGNED_OUT' && user) {
-              setTimeout(async () => {
-                await auditLogger.logUserLogout(user.id);
-              }, 0);
-            }
+          setUserRole(null);
+          
+          // Log logout if this was a sign out event
+          if (event === 'SIGNED_OUT' && user) {
+            setTimeout(async () => {
+              await auditLogger.logUserLogout(user.id);
+            }, 0);
           }
         }
+        
+        setLoading(false);
       }
     );
 
-    // Initialize authentication
-    initializeAuth();
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        // Fetch user role for existing session
+        setTimeout(async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            
+            setUserRole(profile?.role || 'viewer');
+          } catch (error) {
+            console.error('Error fetching user role:', error);
+            setUserRole('viewer');
+          }
+          setLoading(false);
+        }, 0);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Set up session timeout (8 hours)
+    const sessionTimeout = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimeout = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        signOut();
+      }, sessionTimeout);
+    };
+
+    // Start timeout if user is authenticated
+    if (session?.user) {
+      resetTimeout();
+    }
+
+    // Reset timeout on user activity
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const resetTimeoutOnActivity = () => {
+      if (session?.user) resetTimeout();
+    };
+
+    activityEvents.forEach(event => {
+      document.addEventListener(event, resetTimeoutOnActivity, true);
+    });
 
     return () => {
-      mounted = false;
       subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, resetTimeoutOnActivity, true);
+      });
     };
   }, []);
 
   const signOut = async () => {
-    console.log('Signing out...');
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

@@ -112,7 +112,7 @@ const isTextFile = (bytes: Uint8Array): boolean => {
 export const sanitizeFileName = (fileName: string): string => {
   // Remove path separators and potentially dangerous characters
   const sanitized = fileName
-    .replace(/[/\\:*?"<>|]/g, '_') // Replace dangerous characters
+    .replace(/[\/\\:*?"<>|]/g, '_') // Replace dangerous characters
     .replace(/\.\./g, '_') // Remove path traversal attempts
     .replace(/^\.+/, '') // Remove leading dots
     .trim();

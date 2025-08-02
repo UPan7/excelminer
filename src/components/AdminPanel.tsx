@@ -30,6 +30,14 @@ export function AdminPanel() {
   const [inviting, setInviting] = useState(false);
   const [deletingUsers, setDeletingUsers] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    if (userRole === 'admin') {
+      fetchUsers();
+    } else {
+      setLoading(false);
+    }
+  }, [userRole]);
+
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
@@ -50,15 +58,6 @@ export function AdminPanel() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (userRole === 'admin') {
-      fetchUsers();
-    } else {
-      setLoading(false);
-    }
-  }, [userRole]);
-
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
