@@ -50,7 +50,8 @@ class SessionManager {
   }
 
   public getTimeUntilExpiry(): number {
-    return SESSION_TIMEOUT - (Date.now() - this.lastActivity);
+    const remainingTime = SESSION_TIMEOUT - (Date.now() - this.lastActivity);
+    return Math.max(0, remainingTime);
   }
 
   public destroy() {
@@ -61,3 +62,4 @@ class SessionManager {
 }
 
 export const sessionManager = new SessionManager();
+export { SessionManager };
